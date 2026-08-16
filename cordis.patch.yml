@@ -1,0 +1,4 @@
+# dsh-custom-theme-import bundle patch: inserts one Web UI plugin card.
+- insert:
+    - id: custom-theme-import
+      name: 'dsh-custom-theme-import'
