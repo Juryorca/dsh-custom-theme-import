@@ -7,50 +7,35 @@ const NS = 'custom-theme-import'
 const STYLE_TAG_ID = `${ID}/theme`
 const READ_CHANNEL = '/dsh-custom-theme-import-read'
 const WRITE_CHANNEL = '/dsh-custom-theme-import-write'
-const DEFAULT_VALUE = Object.freeze({ id: '', name: '', css: '', dom: '', path: '' })
 
 const zh = {
-  title: '自定义主题导入',
-  description: '主题库保存在本机 ~/.dsh/dsh-custom-theme-import/library.json，换浏览器也在。',
-  library: '主题库',
-  empty: '当前没有主题包，请先导入。',
-  active: '当前激活',
-  clickApply: '点击「应用」可切换到此主题',
-  import: '导入主题',
-  addPath: '添加本地路径主题',
-  export: '导出当前主题',
-  disable: '停用当前主题',
-  apply: '应用',
-  edit: '编辑',
+  title: '我的主题',
+  description: '在这里添加、切换和管理自定义主题。主题保存在本机，换浏览器也不会丢。',
+  add: '添加主题',
+  pathPlaceholder: '或填写本地文件路径，如 /home/.../theme.dsh-theme.json',
+  library: '我的主题',
+  empty: '还没有主题，先添加一个吧。',
+  inUse: '使用中',
+  notInUse: '未使用',
+  use: '使用',
+  disable: '禁用',
+  export: '导出',
   delete: '删除',
-  save: '保存修改',
-  name: '主题名称',
-  css: 'CSS',
-  dom: 'DOM 脚本（可选）',
-  path: '本地主题文件路径（.json / .css）',
-  domPlaceholder: '// 示例：(ctx) => { ... return cleanup } 或直接写使用 ctx.effect 的函数体',
 }
 
 const en = {
-  title: 'Custom Theme Import',
-  description: 'Theme library is stored on this machine at ~/.dsh/dsh-custom-theme-import/library.json and shared across browsers.',
-  library: 'Theme library',
-  empty: 'No theme packs yet. Import one to begin.',
-  active: 'Active',
-  clickApply: 'Click Apply to use this theme',
-  import: 'Import theme',
-  addPath: 'Add local path theme',
-  export: 'Export current theme',
-  disable: 'Disable current theme',
-  apply: 'Apply',
-  edit: 'Edit',
+  title: 'My Themes',
+  description: 'Add, switch, and manage custom themes here. Themes are stored on this machine and survive browser changes.',
+  add: 'Add theme',
+  pathPlaceholder: 'or enter a local file path, e.g. /home/.../theme.dsh-theme.json',
+  library: 'My themes',
+  empty: 'No themes yet. Add one to begin.',
+  inUse: 'In use',
+  notInUse: 'Not in use',
+  use: 'Use',
+  disable: 'Disable',
+  export: 'Export',
   delete: 'Delete',
-  save: 'Save changes',
-  name: 'Theme name',
-  css: 'CSS',
-  dom: 'DOM script (optional)',
-  path: 'Local theme file path (.json / .css)',
-  domPlaceholder: '// Example: (ctx) => { ... return cleanup } or a function body using ctx.effect',
 }
 
 function makeId() {
@@ -74,8 +59,6 @@ function ThemeCard({ api }) {
     resolved: [],
     activeId: null,
     revision: 0,
-    editingId: null,
-    draft: { ...DEFAULT_VALUE },
     notice: null,
     pathInput: '',
   })
@@ -85,16 +68,12 @@ function ThemeCard({ api }) {
     let alive = true
     api.load().then((view) => {
       if (!alive) return
-      const editingId = view.activeId || (view.packs[0] && view.packs[0].id) || null
-      const editing = view.resolved.find((pack) => pack.id === editingId)
       setState({
         status: 'ready',
         packs: view.packs,
         resolved: view.resolved,
         activeId: view.activeId,
         revision: view.revision,
-        editingId,
-        draft: editing ? { ...editing } : { ...DEFAULT_VALUE },
         notice: null,
         pathInput: '',
       })
@@ -110,20 +89,14 @@ function ThemeCard({ api }) {
   const persist = async (packs, activeId, message) => {
     try {
       const view = await api.save(packs, state.revision, activeId)
-      setState((current) => {
-        const editingId = activeId || (view.packs[0] && view.packs[0].id) || null
-        const editing = view.resolved.find((pack) => pack.id === editingId)
-        return {
-          ...current,
-          status: 'ready',
-          packs: view.packs,
-          resolved: view.resolved,
-          activeId: view.activeId,
-          revision: view.revision,
-          editingId,
-          draft: editing ? { ...editing } : { ...DEFAULT_VALUE },
-          notice: message || '已保存',
-        }
+      setState({
+        status: 'ready',
+        packs: view.packs,
+        resolved: view.resolved,
+        activeId: view.activeId,
+        revision: view.revision,
+        notice: message || '已保存',
+        pathInput: '',
       })
       setTimeout(() => location.reload(), 700)
     } catch (error) {
@@ -131,41 +104,28 @@ function ThemeCard({ api }) {
     }
   }
 
-  const updateDraft = (patch) => {
-    setState((current) => ({ ...current, draft: { ...current.draft, ...patch } }))
-  }
-
-  const selectPack = (id) => {
-    const pack = state.resolved.find((candidate) => candidate.id === id)
-    setState((current) => ({
-      ...current,
-      editingId: id,
-      draft: pack ? { ...pack } : { ...DEFAULT_VALUE },
-      notice: null,
-    }))
-  }
-
-  const saveDraft = () => {
-    if (!state.draft.name.trim()) {
-      notify('请先填写主题名称')
-      return
-    }
-    const existing = state.packs.some((pack) => pack.id === state.draft.id)
-    const nextPacks = existing
-      ? state.packs.map((pack) => pack.id === state.draft.id ? { ...state.draft } : pack)
-      : [...state.packs, { ...state.draft, id: state.draft.id || makeId() }]
-    persist(nextPacks, state.activeId, `已保存：${state.draft.name}`)
-  }
-
   const applyPack = (id) => {
     const pack = state.packs.find((p) => p.id === id)
     persist(state.packs, id, `已切换到：${pack?.name || id}`)
+  }
+
+  const disableActive = () => {
+    persist(state.packs, null, '已停止使用当前主题')
   }
 
   const deletePack = (id) => {
     const nextPacks = state.packs.filter((pack) => pack.id !== id)
     const nextActive = state.activeId === id ? null : state.activeId
     persist(nextPacks, nextActive, '已删除')
+  }
+
+  const exportPack = (pack) => {
+    download(`${pack.name.toLowerCase().replace(/\s+/g, '-')}.dsh-theme.json`, JSON.stringify({
+      format: 'dsh-custom-theme-import',
+      version: 1,
+      manifest: { id: pack.id, name: pack.name, css: pack.css, dom: pack.dom },
+    }, null, 2))
+    notify(`已导出：${pack.name}`)
   }
 
   const onImportFile = async (event) => {
@@ -187,7 +147,7 @@ function ThemeCard({ api }) {
         css = text
       }
       const pack = { id: makeId(), name, css, dom }
-      persist([...state.packs, pack], pack.id, `已导入并应用：${name}`)
+      persist([...state.packs, pack], pack.id, `已添加并使用：${name}`)
     } catch (error) {
       console.error('dsh-custom-theme-import: import failed', error)
       notify('导入失败，请检查文件格式')
@@ -201,31 +161,12 @@ function ThemeCard({ api }) {
       return
     }
     const pack = { id: makeId(), name: path.split(/[\\/]/).pop() || '本地主题', path }
-    persist([...state.packs, pack], pack.id, `已添加并应用：${pack.name}`)
-  }
-
-  const onExportActive = () => {
-    const active = state.resolved.find((pack) => pack.id === state.activeId)
-    if (!active) {
-      notify('当前没有激活的主题')
-      return
-    }
-    download(`${active.name.toLowerCase().replace(/\s+/g, '-')}.dsh-theme.json`, JSON.stringify({
-      format: 'dsh-custom-theme-import',
-      version: 1,
-      manifest: { id: active.id, name: active.name, css: active.css, dom: active.dom },
-    }, null, 2))
-    notify('已导出主题包')
-  }
-
-  const onDisable = () => {
-    persist(state.packs, null, '已停用当前主题')
+    persist([...state.packs, pack], pack.id, `已添加并使用：${pack.name}`)
   }
 
   const h = React.createElement
   const rowStyle = { marginBottom: '10px' }
   const labelStyle = { display: 'block', marginBottom: '4px', fontWeight: 600 }
-  const textareaStyle = { width: '100%', minHeight: '80px', boxSizing: 'border-box', fontFamily: 'monospace' }
   const buttonStyle = { marginRight: '8px' }
 
   const noticeBlock = state.notice
@@ -243,7 +184,7 @@ function ThemeCard({ api }) {
     : null
 
   const packList = state.resolved.length === 0
-    ? h('p', { key: 'empty' }, '当前没有主题包，请先导入。')
+    ? h('p', { key: 'empty' }, '还没有主题，先添加一个吧。')
     : h('div', { key: 'list', style: { display: 'flex', flexDirection: 'column', gap: '8px' } }, state.resolved.map((pack) => {
         const active = state.activeId === pack.id
         const raw = state.packs.find((candidate) => candidate.id === pack.id)
@@ -263,53 +204,43 @@ function ThemeCard({ api }) {
           h('div', { key: 'info', style: { minWidth: 0 } }, [
             h('div', { key: 'name', style: { fontWeight: 600 } }, pack.name),
             h('div', { key: 'status', style: { fontSize: '12px', color: active ? '#4f83f2' : '#888' } }, [
-              active ? '当前激活' : '点击「应用」可切换到此主题',
+              active ? '使用中' : '未使用',
               raw && raw.path ? ` · ${raw.path}` : '',
             ]),
           ]),
           h('div', { key: 'ops', style: { display: 'flex', gap: '6px', flexShrink: 0 } }, [
-            h('button', { key: 'apply', onClick: () => applyPack(pack.id), style: { ...buttonStyle, marginRight: 0 } }, '应用'),
-            h('button', { key: 'edit', onClick: () => selectPack(pack.id) }, '编辑'),
+            h('button', { key: 'apply', onClick: () => active ? disableActive() : applyPack(pack.id), style: { ...buttonStyle, marginRight: 0 } }, active ? '禁用' : '使用'),
+            h('button', { key: 'export', onClick: () => exportPack(pack) }, '导出'),
             h('button', { key: 'delete', onClick: () => deletePack(pack.id) }, '删除'),
           ]),
         ])
       }))
 
   return h('div', null, [
-    h('h3', { key: 'title' }, '自定义主题导入'),
-    h('p', { key: 'desc' }, '主题库保存在本机 ~/.dsh/dsh-custom-theme-import/library.json，换浏览器也在。'),
+    h('h3', { key: 'title' }, '我的主题'),
+    h('p', { key: 'desc' }, '在这里添加、切换和管理自定义主题。主题保存在本机，换浏览器也不会丢。'),
     noticeBlock,
-    h('div', { key: 'actions', style: rowStyle }, [
-      h('input', { key: 'file', type: 'file', ref: fileRef, accept: '.json,.css,application/json,text/css', onChange: onImportFile, style: { display: 'none' } }),
-      h('button', { key: 'import', onClick: () => fileRef.current && fileRef.current.click(), style: buttonStyle }, '导入主题'),
-      h('button', { key: 'export', onClick: onExportActive, style: buttonStyle }, '导出当前主题'),
-      h('button', { key: 'disable', onClick: onDisable }, '停用当前主题'),
-    ]),
-    h('div', { key: 'path-row', style: rowStyle }, [
-      h('input', {
-        key: 'path-input',
-        type: 'text',
-        value: state.pathInput,
-        onChange: (e) => setState((current) => ({ ...current, pathInput: e.target.value })),
-        placeholder: '/home/juryorca/dsh/isaac-theme/dsh-custom-theme-import/examples/isaac-basement.dsh-theme.json',
-        style: { width: '70%', boxSizing: 'border-box', marginRight: '8px' },
-      }),
-      h('button', { key: 'add-path', onClick: onAddPath }, '添加本地路径主题'),
+    h('div', { key: 'add-section', style: { ...rowStyle, border: '1px solid #ddd', borderRadius: '8px', padding: '12px' } }, [
+      h('div', { key: 'add-title', style: { fontWeight: 600, marginBottom: '8px' } }, '添加主题'),
+      h('div', { key: 'file-row', style: { marginBottom: '8px' } }, [
+        h('input', { key: 'file', type: 'file', ref: fileRef, accept: '.json,.css,application/json,text/css', onChange: onImportFile, style: { display: 'none' } }),
+        h('button', { key: 'from-file', onClick: () => fileRef.current && fileRef.current.click(), style: buttonStyle }, '选择文件'),
+      ]),
+      h('div', { key: 'path-row', style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+        h('input', {
+          key: 'path-input',
+          type: 'text',
+          value: state.pathInput,
+          onChange: (e) => setState((current) => ({ ...current, pathInput: e.target.value })),
+          placeholder: '或填写本地文件路径，如 /home/.../theme.dsh-theme.json',
+          style: { flex: 1, boxSizing: 'border-box' },
+        }),
+        h('button', { key: 'add-path', onClick: onAddPath }, '添加'),
+      ]),
     ]),
     h('div', { key: 'library', style: rowStyle }, [
-      h('label', { key: 'l', style: labelStyle }, '主题库'),
+      h('label', { key: 'l', style: labelStyle }, '我的主题'),
       packList,
-    ]),
-    h('div', { key: 'editor', style: rowStyle }, [
-      h('label', { key: 'name-l', style: labelStyle }, '主题名称'),
-      h('input', { key: 'name-i', value: state.draft.name, onChange: (e) => updateDraft({ name: e.target.value }), style: { width: '100%', boxSizing: 'border-box' } }),
-      h('label', { key: 'css-l', style: { ...labelStyle, marginTop: '8px' } }, 'CSS'),
-      h('textarea', { key: 'css-t', value: state.draft.css, onChange: (e) => updateDraft({ css: e.target.value }), style: textareaStyle, spellCheck: false }),
-      h('label', { key: 'dom-l', style: { ...labelStyle, marginTop: '8px' } }, 'DOM 脚本（可选）'),
-      h('textarea', { key: 'dom-t', value: state.draft.dom, onChange: (e) => updateDraft({ dom: e.target.value }), style: textareaStyle, spellCheck: false, placeholder: '// 示例：(ctx) => { ... return cleanup } 或直接写使用 ctx.effect 的函数体' }),
-      h('div', { key: 'save-row', style: { marginTop: '8px' } }, [
-        h('button', { key: 'save', onClick: saveDraft }, '保存修改'),
-      ]),
     ]),
   ])
 }
