@@ -47,26 +47,35 @@ Open:
 设置 → 插件配置 → Web UI 插件 → 自定义主题导入
 ```
 
-## Use the Isaac Basement example
+## Use the Isaac Basement theme
 
 Isaac theme source: https://github.com/Juryorca/isaac-basement-theme
 
-Import via file picker:
+Recommended (path-based development layout): add the theme project directory by
+path in the plugin UI:
+
+```text
+/home/juryorca/dsh/isaac-theme/isaac-basement-theme
+```
+
+or add its manifest:
+
+```text
+/home/juryorca/dsh/isaac-theme/isaac-basement-theme/theme.json
+```
+
+The plugin reads `theme.css` and `dom.js` from disk, so you can edit the theme
+sources directly without regenerating an embedded JSON pack.
+
+A generated embedded pack also exists for convenience:
 
 ```text
 /home/juryorca/dsh/isaac-theme/dsh-custom-theme-import/examples/isaac-basement.dsh-theme.json
 ```
-
-Or add it by path in the plugin UI:
-
-```text
-/home/juryorca/dsh/isaac-theme/dsh-custom-theme-import/examples/isaac-basement.dsh-theme.json
-```
-
-Then click **应用** / **Apply**. The theme is stored in the host library and
-auto-applies on every launch.
 
 ## Theme pack format
+
+### Inline pack (embedded)
 
 ```json
 {
@@ -75,7 +84,6 @@ auto-applies on every launch.
   "manifest": {
     "id": "my-theme",
     "name": "My Theme",
-    "colorScheme": "dark",
     "css": "/* full CSS */",
     "dom": "(ctx) => { /* optional DOM setup; may use ctx.effect */ }"
   }
@@ -85,6 +93,25 @@ auto-applies on every launch.
 The `dom` field is optional. It may be a function expression that receives
 `ctx`, or a function body that uses `ctx.effect`. If it returns a function,
 that function is used as the cleanup disposer.
+
+### Path-based theme project (recommended for development)
+
+Instead of embedding CSS/DOM, a manifest can reference files on disk:
+
+```json
+{
+  "id": "my-theme",
+  "name": "My Theme",
+  "cssFile": "theme.css",
+  "domFile": "dom.js"
+}
+```
+
+- The path can point to this `theme.json` directly, or to a directory
+  containing `theme.json` / `theme.css` / `dom.js`.
+- `cssFile` and `domFile` are resolved relative to the manifest/directory.
+- Editing source files takes effect after the plugin reloads; no need to keep
+  a huge generated JSON in sync.
 
 ## Storage
 
