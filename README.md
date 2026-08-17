@@ -13,13 +13,15 @@ data clears, and official plugin updates.
 
 ## Features
 
-- Import a `.json` theme pack (`{ css, dom }`) or a plain `.css` file.
-- Add a local theme file by absolute path (`.json` / `.css`).
-- Manage multiple themes in a library with Apply / Edit / Delete.
+- Add a local theme by path:
+  - a `.dsh-theme.json` / `.json` inline pack
+  - a `.css` file
+  - a path-based theme project directory (`theme.json` + `theme.css` + `dom.js`)
+- Manage multiple themes in a library with Use / Disable / Export / Delete.
 - Active theme is persisted on the host and shared across browsers.
-- Export the current theme as a `.dsh-theme.json` file.
+- Export a theme as a `.dsh-theme.json` file.
 - Disable the custom theme without uninstalling.
-- Ships an Isaac Basement example pack in `examples/`.
+- Ships an Isaac Basement theme example in `examples/`.
 
 ## Build
 
@@ -51,8 +53,8 @@ Open:
 
 Isaac theme source: https://github.com/Juryorca/isaac-basement-theme
 
-Recommended (path-based development layout): clone the theme repo, then add
-the theme project directory by path in the plugin UI:
+Recommended (path-based development layout): clone the theme repo, then in the
+plugin UI add the theme project directory by path:
 
 ```text
 /path/to/isaac-basement-theme
@@ -66,12 +68,6 @@ or add its manifest:
 
 The plugin reads `theme.css` and `dom.js` from disk, so you can edit the theme
 sources directly without regenerating an embedded JSON pack.
-
-A generated embedded pack also exists for convenience:
-
-```text
-/path/to/dsh-custom-theme-import/examples/isaac-basement.dsh-theme.json
-```
 
 ## Theme pack format
 
