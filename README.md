@@ -49,6 +49,8 @@ Open:
 
 ## Use the Isaac Basement example
 
+Isaac theme source: https://github.com/Juryorca/isaac-basement-theme
+
 Import via file picker:
 
 ```text
