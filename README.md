@@ -32,7 +32,7 @@ node build.mjs --check
 
 ```bash
 dsh plugin --profile web add -w \
-  link:/home/juryorca/dsh/isaac-theme/dsh-custom-theme-import
+  link:/absolute/path/to/dsh-custom-theme-import
 ```
 
 Restart:
@@ -51,17 +51,17 @@ Open:
 
 Isaac theme source: https://github.com/Juryorca/isaac-basement-theme
 
-Recommended (path-based development layout): add the theme project directory by
-path in the plugin UI:
+Recommended (path-based development layout): clone the theme repo, then add
+the theme project directory by path in the plugin UI:
 
 ```text
-/home/juryorca/dsh/isaac-theme/isaac-basement-theme
+/path/to/isaac-basement-theme
 ```
 
 or add its manifest:
 
 ```text
-/home/juryorca/dsh/isaac-theme/isaac-basement-theme/theme.json
+/path/to/isaac-basement-theme/theme.json
 ```
 
 The plugin reads `theme.css` and `dom.js` from disk, so you can edit the theme
@@ -70,7 +70,7 @@ sources directly without regenerating an embedded JSON pack.
 A generated embedded pack also exists for convenience:
 
 ```text
-/home/juryorca/dsh/isaac-theme/dsh-custom-theme-import/examples/isaac-basement.dsh-theme.json
+/path/to/dsh-custom-theme-import/examples/isaac-basement.dsh-theme.json
 ```
 
 ## Theme pack format
