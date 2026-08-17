@@ -139,7 +139,9 @@ async function handle(endpoint, payload, write) {
         return { ok: false, error: { code: 'settings-conflict', message: 'stale library revision', details: { expected: payload.expectedRevision, actual: library.revision } } }
       }
       library.packs = payload.packs
-      library.activeId = typeof payload.activeId === 'string' ? payload.activeId : library.activeId
+      if (Object.prototype.hasOwnProperty.call(payload, 'activeId')) {
+        library.activeId = payload.activeId
+      }
       library.revision += 1
       writeLibrary(library)
       return { ok: true, value: view() }
