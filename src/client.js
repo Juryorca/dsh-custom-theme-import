@@ -448,8 +448,8 @@ function apply(ctx) {
     },
   }
 
-  ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register(
-    { name: 'web-ui.plugin.item', id: 'custom-theme-import', order: 130, locale: NS, inject: () => ({ api, t }) },
+  ctx.slots.inject('settings.section', () => ctx.slots.register(
+    { name: 'settings.section', id: 'custom-theme-import', order: 200, label: () => t('title'), locale: NS, inject: () => ({ api, t }) },
     ThemeCard,
   ))
 

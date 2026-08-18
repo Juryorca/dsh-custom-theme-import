@@ -45,7 +45,7 @@ dsh --profile web
 Open:
 
 ```text
-设置 → 插件配置 → Web UI 插件 → 自定义主题导入
+设置 → 我的主题（或 Settings → My Themes）
 ```
 
 ## Theme format
