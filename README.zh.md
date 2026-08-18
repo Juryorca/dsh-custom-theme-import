@@ -30,9 +30,17 @@ node build.mjs --check
 
 ## 安装
 
+通过 GitHub 安装（推荐）：
+
+```bash
+dsh plugin --profile web add -w github:Juryorca/dsh-custom-theme-import
+```
+
+或通过本地目录安装：
+
 ```bash
 dsh plugin --profile web add -w \
-  link:/绝对路径/dsh-custom-theme-import
+  link:/本地路径/dsh-custom-theme-import
 ```
 
 重启：

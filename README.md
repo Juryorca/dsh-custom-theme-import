@@ -34,9 +34,17 @@ node build.mjs --check
 
 ## Install
 
+From GitHub (recommended):
+
+```bash
+dsh plugin --profile web add -w github:Juryorca/dsh-custom-theme-import
+```
+
+Or from a local checkout:
+
 ```bash
 dsh plugin --profile web add -w \
-  link:/absolute/path/to/dsh-custom-theme-import
+  link:/path/to/dsh-custom-theme-import
 ```
 
 Restart:
