@@ -191,6 +191,23 @@ function isManagedPath(target) {
   return resolved === root || resolved.startsWith(root + sep)
 }
 
+function removeManagedPath(target) {
+  if (!isManagedPath(target)) return
+  rmSync(target, { recursive: true, force: true })
+  // Clean empty ancestor folders left by old nested collection imports.
+  const root = resolve(THEMES_DIR)
+  let current = dirname(resolve(target))
+  while (current !== root && (current.startsWith(root + sep) || current === root)) {
+    try {
+      if (readdirSync(current).length > 0) break
+      rmSync(current, { recursive: true, force: true })
+      current = dirname(current)
+    } catch {
+      break
+    }
+  }
+}
+
 function resolvePack(pack) {
   const fallback = (extra = {}) => ({
     id: pack && pack.id ? pack.id : '',
@@ -358,7 +375,7 @@ async function handle(endpoint, payload, write) {
       }
       const removed = library.packs[index]
       if (removed && typeof removed.path === 'string' && isManagedPath(removed.path)) {
-        rmSync(removed.path, { recursive: true, force: true })
+        removeManagedPath(removed.path)
       }
       library.packs.splice(index, 1)
       if (library.activeId === id) library.activeId = null
