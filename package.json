@@ -34,7 +34,7 @@
     "cordis.patch.yml",
     "src",
     "build.mjs",
-    "examples",
-    "README.md"
+    "README.md",
+    "README.zh.md"
   ]
 }
