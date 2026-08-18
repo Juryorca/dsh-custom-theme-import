@@ -17,8 +17,8 @@ rebuilding or reinstalling.
 
 - Import local themes by path.
 - Import GitHub repositories or raw files; theme collections are supported.
-- Add to library without switching the active theme.
-- Preview a theme without committing to it.
+- Add themes without interrupting your current theme.
+- Preview a theme before committing to it.
 - Use / disable / refresh / export / delete themes.
 - Host-side persistence: survives browser changes and browser data clears.
 - Managed copies for remote imports; local imports can stay in place or be
