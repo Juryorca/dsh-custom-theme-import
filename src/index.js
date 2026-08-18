@@ -161,6 +161,30 @@ function collectThemeEntries(target) {
   return []
 }
 
+function materializeManagedEntries(target) {
+  if (validateManagedTheme(target)) {
+    return [{ name: basename(target), path: target }]
+  }
+  const themesDir = join(target, 'themes')
+  if (existsSync(themesDir) && statSync(themesDir).isDirectory()) {
+    const entries = []
+    for (const entry of readdirSync(themesDir)) {
+      const candidate = join(themesDir, entry)
+      if (!statSync(candidate).isDirectory()) continue
+      if (!validateManagedTheme(candidate)) continue
+      const flatId = makeId()
+      const flatTarget = join(THEMES_DIR, flatId)
+      rmSync(flatTarget, { recursive: true, force: true })
+      mkdirSync(flatTarget, { recursive: true })
+      cpSync(candidate, flatTarget, { recursive: true })
+      entries.push({ name: entry, path: flatTarget })
+    }
+    rmSync(target, { recursive: true, force: true })
+    return entries
+  }
+  return []
+}
+
 function isManagedPath(target) {
   const resolved = resolve(expandHome(target))
   const root = resolve(THEMES_DIR)
@@ -288,7 +312,7 @@ async function handle(endpoint, payload, write) {
       if (copy) {
         const id = makeId()
         const target = copySourceToManaged(sourcePath, id)
-        entries = collectThemeEntries(target)
+        entries = materializeManagedEntries(target)
       } else {
         entries = collectThemeEntries(sourcePath)
       }
@@ -310,7 +334,7 @@ async function handle(endpoint, payload, write) {
       const library = readLibrary()
       const id = makeId()
       const target = await importGithubToManaged(url, id)
-      const entries = collectThemeEntries(target)
+      const entries = materializeManagedEntries(target)
       if (entries.length === 0) {
         rmSync(target, { recursive: true, force: true })
         return { ok: false, error: { code: 'invalid-theme', message: '无法识别该 GitHub 来源为主题：需要 theme.json / theme.css / 有效 .json/.css 文件，或 themes/ 集合目录', details: {} } }
