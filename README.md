@@ -138,7 +138,10 @@ Rules:
 ## Storage
 
 - Library file: `~/.dsh/dsh-custom-theme-import/library.json`
-- Entries can be inline (`css` / `dom`) or path-based (`path` pointing to a
-  local `.json` / `.css` file).
+- Local path imports are referenced **in place**; the plugin does not copy them.
+- GitHub/remote imports are cloned/downloaded into:
+  `~/.dsh/dsh-custom-theme-import/themes/<id>/`
+- Entries can still be inline (`css` / `dom`) or path-based (`path` pointing to
+  a local `.json` / `.css` file).
 - The DOM script is executed as JavaScript in your browser; only import packs
   from sources you trust.
