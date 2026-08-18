@@ -6,6 +6,7 @@ const ID = 'dsh-custom-theme-import'
 const NS = 'custom-theme-import'
 const READ_CHANNEL = '/dsh-custom-theme-import-read'
 const WRITE_CHANNEL = '/dsh-custom-theme-import-write'
+const API_PREFIX = '/api/dsh-custom-theme-import'
 
 const zh = {
   title: '我的主题',
@@ -26,6 +27,10 @@ const zh = {
   preview: '预览',
   delete: '删除',
   refresh: '刷新',
+  scanInstalled: '扫描已安装皮肤',
+  scanInstalledNone: '没有发现新的已安装皮肤',
+  scanInstalledCount: '已添加 {count} 个已安装皮肤',
+  scanInstalledFailed: '扫描失败：{message}',
   copyLocal: '复制到插件主题库（托管副本）',
   refreshSuccess: '已刷新',
   refreshFailed: '刷新失败：{message}',
@@ -67,6 +72,10 @@ const en = {
   preview: 'Preview',
   delete: 'Delete',
   refresh: 'Refresh',
+  scanInstalled: 'Scan installed skins',
+  scanInstalledNone: 'No new installed skins found',
+  scanInstalledCount: 'Added {count} installed skins',
+  scanInstalledFailed: 'Scan failed: {message}',
   copyLocal: 'Copy into the plugin theme library (managed copy)',
   refreshSuccess: 'Refreshed',
   refreshFailed: 'Refresh failed: {message}',
@@ -91,6 +100,23 @@ const en = {
 
 function makeId() {
   return `pack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function loadBundleScript(url) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script')
+    el.async = true
+    el.src = url
+    el.addEventListener('load', () => {
+      el.remove()
+      resolve()
+    }, { once: true })
+    el.addEventListener('error', () => {
+      el.remove()
+      reject(new Error('皮肤 bundle 加载失败'))
+    }, { once: true })
+    document.head.append(el)
+  })
 }
 
 function ThemeCard({ api, t }) {
@@ -296,6 +322,16 @@ function ThemeCard({ api, t }) {
     }
   }
 
+  const onScanInstalled = async () => {
+    try {
+      const result = await api.scanInstalled()
+      const view = result.view
+      applyView(view, result.added > 0 ? fmt('scanInstalledCount', { count: result.added }) : t('scanInstalledNone'))
+    } catch (error) {
+      notify(fmt('scanInstalledFailed', { message: error.message }))
+    }
+  }
+
   const h = React.createElement
   const rowStyle = { marginBottom: '10px' }
   const labelStyle = { display: 'block', marginBottom: '4px', fontWeight: 600 }
@@ -335,11 +371,21 @@ function ThemeCard({ api, t }) {
             background: active || previewing ? 'rgba(79, 131, 242, 0.08)' : 'transparent',
           },
         }, [
-          h('div', { key: 'info', style: { minWidth: 0 } }, [
-            h('div', { key: 'name', style: { fontWeight: 600 } }, pack.name),
-            h('div', { key: 'status', style: { fontSize: '12px', color: active || previewing ? '#4f83f2' : '#888' } }, [
-              status,
-              raw && raw.path ? ` · ${raw.path}` : '',
+          h('div', { key: 'info', style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } }, [
+            pack.preview && (pack.preview.light || pack.preview.dark)
+              ? h('img', {
+                  key: 'thumb',
+                  src: pack.preview.light || pack.preview.dark,
+                  alt: pack.name,
+                  style: { width: 56, height: 36, objectFit: 'cover', borderRadius: 4, flexShrink: 0 },
+                })
+              : null,
+            h('div', { key: 'text', style: { minWidth: 0 } }, [
+              h('div', { key: 'name', style: { fontWeight: 600 } }, pack.name),
+              h('div', { key: 'status', style: { fontSize: '12px', color: active || previewing ? '#4f83f2' : '#888' } }, [
+                status,
+                raw && raw.path ? ` · ${raw.path}` : '',
+              ]),
             ]),
           ]),
           h('div', { key: 'ops', style: { display: 'flex', gap: '6px', flexShrink: 0 } }, [
@@ -356,6 +402,7 @@ function ThemeCard({ api, t }) {
     noticeBlock,
     h('div', { key: 'toolbar', style: { ...rowStyle } }, [
       h('button', { key: 'refresh', onClick: () => refresh(false), style: buttonStyle }, t('refresh')),
+      h('button', { key: 'scan-installed', onClick: onScanInstalled, style: buttonStyle }, t('scanInstalled')),
     ]),
     h('div', { key: 'add-section', style: { ...rowStyle, border: '1px solid #ddd', borderRadius: '8px', padding: '12px' } }, [
       h('div', { key: 'add-title', style: { fontWeight: 600, marginBottom: '8px' } }, t('add')),
@@ -414,58 +461,53 @@ function apply(ctx) {
     let domCleanup = null
     let skinFiber = null
 
-    if (pack && pack.bundle) {
+    if (pack && pack.moduleId) {
       try {
-        let capturedFactory = null
-        const originalLoader = window.__ModuleLoader__
-        window.__ModuleLoader__ = { load: (handoff) => { capturedFactory = handoff.factory } }
-        try {
-          ;(0, eval)(pack.bundle)
-        } finally {
-          window.__ModuleLoader__ = originalLoader
+        const modules = globalThis.__DSH_MODULES__
+        if (!modules || typeof modules.import !== 'function' || typeof modules.invalidate !== 'function') {
+          throw new Error('当前 DSH 运行环境不支持动态皮肤加载（缺少 __DSH_MODULES__）')
         }
-        if (typeof capturedFactory === 'function') {
-          const modules = globalThis.__DSH_MODULES__
-          if (!modules || typeof modules.import !== 'function' || !modules.factories) {
-            throw new Error('当前 DSH 运行环境不支持动态皮肤加载（缺少 __DSH_MODULES__）')
-          }
-          const skinId = `dsh-custom-theme-import:${pack.id}`
-          modules.factories.set(skinId, capturedFactory)
-          const mod = await modules.import(skinId)
-          if (token !== installToken) {
-            if (typeof modules.invalidate === 'function') modules.invalidate(skinId)
-            return
-          }
-          const applyFn = mod && (typeof mod.apply === 'function' ? mod.apply : mod.default && typeof mod.default.apply === 'function' ? mod.default.apply : null)
-          if (typeof applyFn === 'function') {
-            const modInject = Array.isArray(mod && mod.inject) ? mod.inject : []
-            const pkgInject = Array.isArray(pack && pack.inject) ? pack.inject : []
-            const skinInject = Array.from(new Set([...modInject, ...pkgInject]))
-            const missing = []
-            const resolvedInject = []
-            for (const name of skinInject) {
-              let present = false
-              try { present = typeof ctx.get(name) !== 'undefined' } catch { present = false }
-              if (present) {
-                resolvedInject.push(name)
-              } else {
-                missing.push(name)
-              }
+        const moduleId = pack.moduleId
+        modules.invalidate(moduleId)
+        await loadBundleScript(`${API_PREFIX}/bundle?id=${encodeURIComponent(pack.id)}`)
+        if (token !== installToken) {
+          modules.invalidate(moduleId)
+          return
+        }
+        const mod = await modules.import(moduleId)
+        if (token !== installToken) {
+          modules.invalidate(moduleId)
+          return
+        }
+        const applyFn = mod && (typeof mod.apply === 'function' ? mod.apply : mod.default && typeof mod.default.apply === 'function' ? mod.default.apply : null)
+        if (typeof applyFn === 'function') {
+          const modInject = Array.isArray(mod && mod.inject) ? mod.inject : []
+          const pkgInject = Array.isArray(pack && pack.inject) ? pack.inject : []
+          const skinInject = Array.from(new Set([...modInject, ...pkgInject]))
+          const missing = []
+          const resolvedInject = []
+          for (const name of skinInject) {
+            let present = false
+            try { present = typeof ctx.get(name) !== 'undefined' } catch { present = false }
+            if (present) {
+              resolvedInject.push(name)
+            } else {
+              missing.push(name)
             }
-            if (missing.length > 0) {
-              throw new Error(`该皮肤需要当前 DSH 未提供的服务：${missing.join(', ')}`)
-            }
-            const fiber = ctx.plugin({
-              inject: resolvedInject,
-              apply: (skinCtx) => {
-                const result = applyFn(skinCtx)
-                if (typeof result === 'function') domCleanup = result
-              },
-              name: 'dsh-custom-theme-import:skin',
-            })
-            skinFiber = fiber
-            currentSkinId = skinId
           }
+          if (missing.length > 0) {
+            throw new Error(`该皮肤需要当前 DSH 未提供的服务：${missing.join(', ')}`)
+          }
+          const fiber = ctx.plugin({
+            inject: resolvedInject,
+            apply: (skinCtx) => {
+              const result = applyFn(skinCtx)
+              if (typeof result === 'function') domCleanup = result
+            },
+            name: 'dsh-custom-theme-import:skin',
+          })
+          skinFiber = fiber
+          currentSkinId = moduleId
         }
       } catch (error) {
         console.error('dsh-custom-theme-import: mainstream bundle apply failed', error)
@@ -475,6 +517,7 @@ function apply(ctx) {
         if (skinFiber) { skinFiber.dispose(); skinFiber = null }
         if (domCleanup) domCleanup()
         if (currentSkinId && globalThis.__DSH_MODULES__ && typeof globalThis.__DSH_MODULES__.invalidate === 'function') {
+          for (const el of document.querySelectorAll(`style[data-plugin=${JSON.stringify(currentSkinId)}]`)) el.remove()
           globalThis.__DSH_MODULES__.invalidate(currentSkinId)
           currentSkinId = null
         }
@@ -482,7 +525,7 @@ function apply(ctx) {
       return
     }
 
-    throw new Error('该条目不是有效的 DSH 皮肤包（缺少 bundle）')
+    throw new Error('该条目不是有效的 DSH 皮肤包（缺少 moduleId）')
   }
 
   const api = {
@@ -508,6 +551,11 @@ function apply(ctx) {
     },
     async importStatus(jobId) {
       const response = await connection.rpc.call(READ_CHANNEL, 'importStatus', { jobId })
+      if (!response.ok) throw new Error(response.error.message)
+      return response.value
+    },
+    async scanInstalled() {
+      const response = await connection.rpc.call(WRITE_CHANNEL, 'scanInstalled', {})
       if (!response.ok) throw new Error(response.error.message)
       return response.value
     },
