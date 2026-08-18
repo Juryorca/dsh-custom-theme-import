@@ -391,6 +391,7 @@ function apply(ctx) {
   const install = (pack) => {
     if (currentCleanup) { currentCleanup(); currentCleanup = null }
     let domCleanup = null
+    let skinFiber = null
 
     if (pack && pack.bundle) {
       try {
@@ -419,14 +420,24 @@ function apply(ctx) {
           const mod = capturedFactory(requireShim)
           const applyFn = mod && (typeof mod.apply === 'function' ? mod.apply : mod.default && typeof mod.default.apply === 'function' ? mod.default.apply : null)
           if (typeof applyFn === 'function') {
-            const result = applyFn(ctx)
-            if (typeof result === 'function') domCleanup = result
+            const fiber = ctx.plugin({
+              inject: [],
+              apply: (skinCtx) => {
+                const result = applyFn(skinCtx)
+                if (typeof result === 'function') domCleanup = result
+              },
+              name: 'dsh-custom-theme-import:skin',
+            })
+            skinFiber = fiber
           }
         }
       } catch (error) {
         console.error('dsh-custom-theme-import: standard bundle apply failed', error)
       }
-      currentCleanup = () => { if (domCleanup) domCleanup() }
+      currentCleanup = () => {
+        if (skinFiber) { skinFiber.dispose(); skinFiber = null }
+        if (domCleanup) domCleanup()
+      }
       return
     }
 
