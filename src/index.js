@@ -3,7 +3,7 @@
 // Each entry can be inline (css/dom) or a path to a .json/.css theme file.
 // The browser half reads/writes this library through loopback-only RPC.
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, cpSync, rmSync, readdirSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 
@@ -13,6 +13,8 @@ const THEMES_DIR = join(DATA_DIR, 'themes')
 const LIBRARY_FILE = join(DATA_DIR, 'library.json')
 const READ_CHANNEL = '/dsh-custom-theme-import-read'
 const WRITE_CHANNEL = '/dsh-custom-theme-import-write'
+
+const importJobs = new Map()
 
 export const inject = ['connection']
 
@@ -82,37 +84,95 @@ function copySourceToManaged(source, id) {
   return target
 }
 
-async function importGithubToManaged(url, id) {
-  const target = join(THEMES_DIR, id)
+function startGithubImport(url) {
+  const jobId = makeId()
+  const target = join(THEMES_DIR, jobId)
   rmSync(target, { recursive: true, force: true })
   mkdirSync(target, { recursive: true })
+  const job = { id: jobId, url, target, status: 'running', message: '准备导入', progress: 0 }
+  importJobs.set(jobId, job)
+
+  const finish = () => {
+    try {
+      const entries = materializeManagedEntries(target)
+      if (entries.length === 0) throw new Error('无法识别该 GitHub 来源为主题：需要 theme.json / theme.css / 有效 .json/.css 文件，或 themes/ 集合目录')
+      const library = readLibrary()
+      for (const entry of entries) {
+        library.packs.push({ id: makeId(), name: entry.name, path: entry.path })
+      }
+      library.revision += 1
+      writeLibrary(library)
+      job.status = 'done'
+      job.progress = 100
+      job.message = '导入完成'
+      job.view = view()
+    } catch (error) {
+      fail(error)
+    }
+  }
+
+  const fail = (error) => {
+    rmSync(target, { recursive: true, force: true })
+    job.status = 'error'
+    job.error = error instanceof Error ? error.message : String(error)
+    job.message = job.error
+  }
+
   const trimmed = url.trim()
   if (/^https?:\/\/(raw\.)?githubusercontent\.com\//i.test(trimmed)) {
-    const fileName = basename(new URL(trimmed).pathname) || 'theme.css'
-    const response = await fetch(trimmed)
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const text = await response.text()
-    writeFileSync(join(target, fileName), text)
-    if (/\.json$/i.test(fileName)) {
+    ;(async () => {
       try {
-        const manifest = JSON.parse(text)
-        const baseUrl = new URL(trimmed)
-        const path = baseUrl.pathname.split('/')
-        path.pop()
-        for (const ref of [manifest.cssFile, manifest.domFile]) {
-          if (typeof ref !== 'string') continue
-          const refUrl = `${baseUrl.origin}${path.join('/')}/${ref}`
-          const refRes = await fetch(refUrl)
-          if (refRes.ok) writeFileSync(join(target, basename(ref)), await refRes.text())
+        job.message = '下载文件中'
+        const fileName = basename(new URL(trimmed).pathname) || 'theme.css'
+        const response = await fetch(trimmed)
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const text = await response.text()
+        writeFileSync(join(target, fileName), text)
+        if (/\.json$/i.test(fileName)) {
+          try {
+            const manifest = JSON.parse(text)
+            const baseUrl = new URL(trimmed)
+            const path = baseUrl.pathname.split('/')
+            path.pop()
+            for (const ref of [manifest.cssFile, manifest.domFile]) {
+              if (typeof ref !== 'string') continue
+              const refUrl = `${baseUrl.origin}${path.join('/')}/${ref}`
+              const refRes = await fetch(refUrl)
+              if (refRes.ok) writeFileSync(join(target, basename(ref)), await refRes.text())
+            }
+          } catch {
+            // Not a manifest; ignore.
+          }
         }
-      } catch {
-        // Not a manifest; ignore.
+        finish()
+      } catch (error) {
+        fail(error)
       }
-    }
-    return target
+    })()
+    return jobId
   }
-  execFileSync('git', ['clone', '--depth', '1', trimmed, target], { stdio: 'inherit' })
-  return target
+
+  const child = spawn('git', ['clone', '--depth', '1', trimmed, target], { stdio: ['ignore', 'ignore', 'pipe'] })
+  let stderr = ''
+  child.stderr.on('data', (chunk) => {
+    const text = chunk.toString()
+    stderr += text
+    const line = text.trim()
+    if (line) job.message = line
+    const percents = line.match(/\d+(?:\.\d+)?%/g)
+    if (percents && percents.length > 0) {
+      job.progress = Math.max(...percents.map((p) => Number.parseFloat(p)))
+    }
+  })
+  child.on('error', (error) => fail(error))
+  child.on('close', (code) => {
+    if (code !== 0) {
+      fail(new Error(stderr.trim() || `git clone failed with code ${code}`))
+      return
+    }
+    finish()
+  })
+  return jobId
 }
 
 function validateManagedTheme(target) {
@@ -332,6 +392,23 @@ async function handle(endpoint, payload, write) {
     if (!write && endpoint === 'get') {
       return { ok: true, value: view() }
     }
+    if (!write && endpoint === 'importStatus') {
+      const jobId = payload && payload.jobId
+      const job = typeof jobId === 'string' ? importJobs.get(jobId) : null
+      if (!job) {
+        return { ok: false, error: { code: 'not-found', message: 'import job not found', details: {} } }
+      }
+      return {
+        ok: true,
+        value: {
+          status: job.status,
+          message: job.message,
+          progress: job.progress,
+          view: job.status === 'done' ? job.view : undefined,
+          error: job.status === 'error' ? job.error : undefined,
+        },
+      }
+    }
     if (write && endpoint === 'save') {
       if (!payload || !Array.isArray(payload.packs) || typeof payload.expectedRevision !== 'number') {
         return { ok: false, error: { code: 'bad-request', message: 'malformed save payload', details: {} } }
@@ -379,20 +456,8 @@ async function handle(endpoint, payload, write) {
       if (typeof url !== 'string' || url === '') {
         return { ok: false, error: { code: 'bad-request', message: 'url is required', details: {} } }
       }
-      const library = readLibrary()
-      const id = makeId()
-      const target = await importGithubToManaged(url, id)
-      const entries = materializeManagedEntries(target)
-      if (entries.length === 0) {
-        rmSync(target, { recursive: true, force: true })
-        return { ok: false, error: { code: 'invalid-theme', message: '无法识别该 GitHub 来源为主题：需要 theme.json / theme.css / 有效 .json/.css 文件，或 themes/ 集合目录', details: {} } }
-      }
-      for (const entry of entries) {
-        library.packs.push({ id: makeId(), name: entry.name, path: entry.path })
-      }
-      library.revision += 1
-      writeLibrary(library)
-      return { ok: true, value: view() }
+      const jobId = startGithubImport(url)
+      return { ok: true, value: { jobId } }
     }
     if (write && endpoint === 'deletePack') {
       const id = payload && payload.id

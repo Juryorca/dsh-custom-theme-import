@@ -16,6 +16,7 @@ const zh = {
   githubPlaceholder: '或粘贴 GitHub / raw 链接',
   addPath: '添加',
   importGithub: '导入 GitHub',
+  importing: '导入中…',
   library: '我的主题',
   empty: '还没有主题，先添加一个吧。',
   inUse: '使用中',
@@ -55,6 +56,7 @@ const en = {
   githubPlaceholder: 'Or paste a GitHub / raw link',
   addPath: 'Add',
   importGithub: 'Import GitHub',
+  importing: 'Importing…',
   library: 'My themes',
   empty: 'No themes yet. Add one to begin.',
   inUse: 'In use',
@@ -104,7 +106,9 @@ function ThemeCard({ api, t }) {
     githubUrl: '',
     copyLocal: false,
     previewId: null,
+    importing: null,
   })
+  const pollTimer = React.useRef(null)
 
   const applyCurrent = (view, previewId) => {
     const target = previewId
@@ -156,6 +160,10 @@ function ThemeCard({ api, t }) {
     })
     return () => { alive = false }
   }, [api])
+
+  React.useEffect(() => () => {
+    if (pollTimer.current) clearTimeout(pollTimer.current)
+  }, [])
 
   const notify = (message) => setState((current) => ({ ...current, notice: message }))
 
@@ -245,12 +253,35 @@ function ThemeCard({ api, t }) {
       notify(t('githubRequired'))
       return
     }
+    if (state.importing) return
+    const beforeCount = state.packs.length
+    setState((current) => ({ ...current, importing: { jobId: null, message: t('importing'), progress: 0 } }))
     try {
-      const view = await api.importGithub(input)
-      const count = view.packs.length - state.packs.length
-      const name = view.packs[view.packs.length - 1]?.name || 'GitHub'
-      applyView(view, count > 1 ? fmt('importedCount', { count }) : fmt('importedOne', { name }))
+      const { jobId } = await api.importGithub(input)
+      const poll = async () => {
+        try {
+          const result = await api.importStatus(jobId)
+          if (result.status === 'done') {
+            const view = result.view
+            const count = view.packs.length - beforeCount
+            const name = view.packs[view.packs.length - 1]?.name || 'GitHub'
+            setState((current) => ({ ...current, importing: null }))
+            applyView(view, count > 1 ? fmt('importedCount', { count }) : fmt('importedOne', { name }))
+          } else if (result.status === 'error') {
+            setState((current) => ({ ...current, importing: null }))
+            notify(fmt('githubFailed', { message: result.error || result.message || 'unknown' }))
+          } else {
+            setState((current) => ({ ...current, importing: { jobId, message: result.message || t('importing'), progress: result.progress || 0 } }))
+            pollTimer.current = setTimeout(poll, 500)
+          }
+        } catch (error) {
+          setState((current) => ({ ...current, importing: null }))
+          notify(fmt('githubFailed', { message: error.message }))
+        }
+      }
+      poll()
     } catch (error) {
+      setState((current) => ({ ...current, importing: null }))
       console.error('dsh-custom-theme-import: github import failed', error)
       notify(fmt('githubFailed', { message: error.message }))
     }
@@ -343,8 +374,14 @@ function ThemeCard({ api, t }) {
           placeholder: t('githubPlaceholder'),
           style: { flex: 1, boxSizing: 'border-box' },
         }),
-        h('button', { key: 'import-github', onClick: onImportGithub }, t('importGithub')),
+        h('button', { key: 'import-github', onClick: onImportGithub, disabled: !!state.importing }, t('importGithub')),
       ]),
+      state.importing
+        ? h('div', { key: 'import-progress', style: { marginTop: '8px', fontSize: '13px', color: '#555' } }, [
+            `${t('importing')}${state.importing.progress ? ` ${Math.round(state.importing.progress)}%` : ''}`,
+            state.importing.message && state.importing.message !== t('importing') ? ` ${state.importing.message}` : '',
+          ])
+        : null,
     ]),
     h('div', { key: 'library', style: rowStyle }, [
       h('label', { key: 'l', style: labelStyle }, t('library')),
@@ -473,6 +510,11 @@ function apply(ctx) {
     },
     async importGithub(url) {
       const response = await connection.rpc.call(WRITE_CHANNEL, 'importGithub', { url })
+      if (!response.ok) throw new Error(response.error.message)
+      return response.value
+    },
+    async importStatus(jobId) {
+      const response = await connection.rpc.call(READ_CHANNEL, 'importStatus', { jobId })
       if (!response.ok) throw new Error(response.error.message)
       return response.value
     },
