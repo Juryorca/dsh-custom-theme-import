@@ -115,6 +115,35 @@ async function importGithubToManaged(url, id) {
   return target
 }
 
+function validateManagedTheme(target) {
+  const stat = statSync(target)
+  if (stat.isDirectory()) {
+    const manifest = join(target, 'theme.json')
+    const css = join(target, 'theme.css')
+    if (existsSync(manifest)) {
+      try {
+        const parsed = JSON.parse(readFileSync(manifest, 'utf8'))
+        const m = parsed && parsed.manifest ? parsed.manifest : parsed
+        if (typeof m.css !== 'string' && typeof m.cssFile !== 'string') return false
+      } catch {
+        return false
+      }
+      return true
+    }
+    return existsSync(css)
+  }
+  if (/\.json$/i.test(target)) {
+    try {
+      const parsed = JSON.parse(readFileSync(target, 'utf8'))
+      const m = parsed && parsed.manifest ? parsed.manifest : parsed
+      return typeof m.css === 'string' || typeof m.cssFile === 'string'
+    } catch {
+      return false
+    }
+  }
+  return /\.css$/i.test(target)
+}
+
 function resolvePack(pack) {
   const fallback = (extra = {}) => ({
     id: pack && pack.id ? pack.id : '',
@@ -232,6 +261,10 @@ async function handle(endpoint, payload, write) {
       const library = readLibrary()
       const id = makeId()
       const target = copySourceToManaged(source, id)
+      if (!validateManagedTheme(target)) {
+        rmSync(target, { recursive: true, force: true })
+        return { ok: false, error: { code: 'invalid-theme', message: '无法识别该路径为主题：需要 theme.json / theme.css / 有效 .json/.css 文件', details: {} } }
+      }
       const name = basename(target)
       library.packs.push({ id, name, path: target })
       library.revision += 1
@@ -246,6 +279,10 @@ async function handle(endpoint, payload, write) {
       const library = readLibrary()
       const id = makeId()
       const target = await importGithubToManaged(url, id)
+      if (!validateManagedTheme(target)) {
+        rmSync(target, { recursive: true, force: true })
+        return { ok: false, error: { code: 'invalid-theme', message: '无法识别该 GitHub 来源为主题：需要 theme.json / theme.css / 有效 .json/.css 文件', details: {} } }
+      }
       const name = basename(target)
       library.packs.push({ id, name, path: target })
       library.revision += 1
