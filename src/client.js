@@ -66,24 +66,6 @@ function download(filename, text) {
   URL.revokeObjectURL(url)
 }
 
-function githubToRaw(input) {
-  const url = input.trim()
-  if (/^https?:\/\/(raw\.)?githubusercontent\.com\//i.test(url)) return url
-  const match = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/(?:blob|raw)\/([^/]+)\/(.+))?$/i)
-  if (!match) return url
-  const [, owner, repo, ref, path] = match
-  if (path) return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`
-  return `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/theme.json`
-}
-
-function resolveRawUrl(base, relative) {
-  const baseUrl = new URL(base)
-  const path = baseUrl.pathname.split('/')
-  path.pop()
-  path.push(relative)
-  return `${baseUrl.origin}${path.join('/')}`
-}
-
 function ThemeCard({ api }) {
   const [state, setState] = React.useState({
     status: 'loading',
@@ -210,18 +192,36 @@ function ThemeCard({ api }) {
     notify(`已导出：${pack.name}`)
   }
 
-  const addPackToLibrary = (pack, message) => {
-    persist([...state.packs, pack], state.activeId, message)
+  const applyView = (view, message) => {
+    setState((current) => {
+      const next = {
+        ...current,
+        status: 'ready',
+        packs: view.packs,
+        resolved: view.resolved,
+        activeId: view.activeId,
+        revision: view.revision,
+        notice: message || '已保存',
+        previewId: null,
+      }
+      applyCurrent(view, null)
+      return next
+    })
   }
 
-  const onAddPath = () => {
+  const onAddPath = async () => {
     const path = state.pathInput.trim()
     if (!path) {
       notify('请填写本地主题文件路径')
       return
     }
-    const pack = { id: makeId(), name: path.split(/[\\/]/).pop() || '本地主题', path }
-    addPackToLibrary(pack, `已添加到列表：${pack.name}`)
+    try {
+      const view = await api.addPath(path)
+      const added = view.packs[view.packs.length - 1]
+      applyView(view, `已添加到列表：${added?.name || path}`)
+    } catch (error) {
+      notify(`添加失败：${error.message}`)
+    }
   }
 
   const onImportGithub = async () => {
@@ -231,36 +231,9 @@ function ThemeCard({ api }) {
       return
     }
     try {
-      const rawUrl = githubToRaw(input)
-      const response = await fetch(rawUrl)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const text = await response.text()
-      let name = rawUrl.split('/').pop().replace(/\.(json|css)$/i, '') || 'GitHub 主题'
-      let css = ''
-      let dom = ''
-      if (/\.json$/i.test(rawUrl) || text.trim().startsWith('{')) {
-        const parsed = JSON.parse(text)
-        const manifest = parsed && parsed.manifest ? parsed.manifest : parsed
-        name = (manifest && typeof manifest.name === 'string' && manifest.name.trim()) ? manifest.name : name
-        if (typeof manifest.cssFile === 'string') {
-          const cssUrl = resolveRawUrl(rawUrl, manifest.cssFile)
-          const cssRes = await fetch(cssUrl)
-          css = cssRes.ok ? await cssRes.text() : ''
-        } else {
-          css = typeof manifest.css === 'string' ? manifest.css : ''
-        }
-        if (typeof manifest.domFile === 'string') {
-          const domUrl = resolveRawUrl(rawUrl, manifest.domFile)
-          const domRes = await fetch(domUrl)
-          dom = domRes.ok ? await domRes.text() : ''
-        } else {
-          dom = typeof manifest.dom === 'string' ? manifest.dom : ''
-        }
-      } else {
-        css = text
-      }
-      const pack = { id: makeId(), name, css, dom }
-      addPackToLibrary(pack, `已添加到列表：${name}`)
+      const view = await api.importGithub(input)
+      const added = view.packs[view.packs.length - 1]
+      applyView(view, `已添加到列表：${added?.name || 'GitHub 主题'}`)
     } catch (error) {
       console.error('dsh-custom-theme-import: github import failed', error)
       notify(`GitHub 导入失败：${error.message}`)
@@ -412,6 +385,16 @@ function apply(ctx) {
     },
     async save(packs, expectedRevision, activeId) {
       const response = await connection.rpc.call(WRITE_CHANNEL, 'save', { packs, expectedRevision, activeId })
+      if (!response.ok) throw new Error(response.error.message)
+      return response.value
+    },
+    async addPath(path) {
+      const response = await connection.rpc.call(WRITE_CHANNEL, 'addPath', { path })
+      if (!response.ok) throw new Error(response.error.message)
+      return response.value
+    },
+    async importGithub(url) {
+      const response = await connection.rpc.call(WRITE_CHANNEL, 'importGithub', { url })
       if (!response.ok) throw new Error(response.error.message)
       return response.value
     },
