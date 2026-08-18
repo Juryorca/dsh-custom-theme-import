@@ -387,8 +387,11 @@ function apply(ctx) {
 
   const connection = ctx.get('connection')
   let currentCleanup = null
+  let currentSkinId = null
+  let installToken = 0
 
-  const install = (pack) => {
+  const install = async (pack) => {
+    const token = ++installToken
     if (currentCleanup) { currentCleanup(); currentCleanup = null }
     let domCleanup = null
     let skinFiber = null
@@ -404,20 +407,24 @@ function apply(ctx) {
           window.__ModuleLoader__ = originalLoader
         }
         if (typeof capturedFactory === 'function') {
-          const requireShim = (spec) => {
-            const modules = globalThis.__DSH_MODULES__
-            if (modules && typeof modules.makeRequire === 'function') {
-              try {
-                return modules.makeRequire(new Set())(spec)
-              } catch {
-                // fall through to local shims
-              }
+          const modules = globalThis.__DSH_MODULES__
+          const skinId = `dsh-custom-theme-import:${pack.id}`
+          let mod = null
+          if (modules && typeof modules.import === 'function' && modules.factories) {
+            modules.factories.set(skinId, capturedFactory)
+            mod = await modules.import(skinId)
+            if (token !== installToken) {
+              if (typeof modules.invalidate === 'function') modules.invalidate(skinId)
+              return
             }
-            if (spec === 'react') return React
-            if (spec === 'react/jsx-runtime') return { jsx: React.createElement, jsxs: React.createElement, Fragment: React.Fragment }
-            throw new Error(`dsh-custom-theme-import: cannot provide module ${spec}`)
+          } else {
+            const requireShim = (spec) => {
+              if (spec === 'react') return React
+              if (spec === 'react/jsx-runtime') return { jsx: React.createElement, jsxs: React.createElement, Fragment: React.Fragment }
+              throw new Error(`dsh-custom-theme-import: cannot provide module ${spec}`)
+            }
+            mod = capturedFactory(requireShim)
           }
-          const mod = capturedFactory(requireShim)
           const applyFn = mod && (typeof mod.apply === 'function' ? mod.apply : mod.default && typeof mod.default.apply === 'function' ? mod.default.apply : null)
           if (typeof applyFn === 'function') {
             const fiber = ctx.plugin({
@@ -429,6 +436,7 @@ function apply(ctx) {
               name: 'dsh-custom-theme-import:skin',
             })
             skinFiber = fiber
+            currentSkinId = skinId
           }
         }
       } catch (error) {
@@ -437,6 +445,10 @@ function apply(ctx) {
       currentCleanup = () => {
         if (skinFiber) { skinFiber.dispose(); skinFiber = null }
         if (domCleanup) domCleanup()
+        if (currentSkinId && globalThis.__DSH_MODULES__ && typeof globalThis.__DSH_MODULES__.invalidate === 'function') {
+          globalThis.__DSH_MODULES__.invalidate(currentSkinId)
+          currentSkinId = null
+        }
       }
       return
     }
