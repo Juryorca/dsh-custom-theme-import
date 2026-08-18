@@ -74,6 +74,7 @@ function ThemeCard({ api }) {
     notice: null,
     pathInput: '',
     githubUrl: '',
+    copyLocal: false,
     previewId: null,
   })
 
@@ -117,6 +118,7 @@ function ThemeCard({ api }) {
         notice: null,
         pathInput: '',
         githubUrl: '',
+        copyLocal: false,
         previewId: null,
       })
       applyCurrent(view, null)
@@ -206,7 +208,7 @@ function ThemeCard({ api }) {
       return
     }
     try {
-      const view = await api.addPath(path)
+      const view = await api.addPath(path, state.copyLocal)
       const count = view.packs.length - state.packs.length
       applyView(view, count > 1 ? `已添加 ${count} 个主题到列表` : `已添加到列表：${view.packs[view.packs.length - 1]?.name || path}`)
     } catch (error) {
@@ -305,6 +307,10 @@ function ThemeCard({ api }) {
         }),
         h('button', { key: 'add-path', onClick: onAddPath }, '添加'),
       ]),
+      h('label', { key: 'copy-local', style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' } }, [
+        h('input', { key: 'copy-local-input', type: 'checkbox', checked: state.copyLocal, onChange: (e) => setState((current) => ({ ...current, copyLocal: e.target.checked })) }),
+        '复制到插件主题库（托管副本）',
+      ]),
       h('div', { key: 'github-row', style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
         h('input', {
           key: 'github-input',
@@ -374,8 +380,8 @@ function apply(ctx) {
       if (!response.ok) throw new Error(response.error.message)
       return response.value
     },
-    async addPath(path) {
-      const response = await connection.rpc.call(WRITE_CHANNEL, 'addPath', { path })
+    async addPath(path, copy = false) {
+      const response = await connection.rpc.call(WRITE_CHANNEL, 'addPath', { path, copy })
       if (!response.ok) throw new Error(response.error.message)
       return response.value
     },

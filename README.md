@@ -138,7 +138,8 @@ Rules:
 ## Storage
 
 - Library file: `~/.dsh/dsh-custom-theme-import/library.json`
-- Local path imports are referenced **in place**; the plugin does not copy them.
+- Local path imports reference **in place** by default; you can opt in to copy
+  them into `~/.dsh/dsh-custom-theme-import/themes/<id>/` as a managed copy.
 - GitHub/remote imports are cloned/downloaded into:
   `~/.dsh/dsh-custom-theme-import/themes/<id>/`
 - Entries can still be inline (`css` / `dom`) or path-based (`path` pointing to
