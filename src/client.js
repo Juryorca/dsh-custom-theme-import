@@ -444,7 +444,7 @@ function apply(ctx) {
               try { present = typeof ctx.get(name) !== 'undefined' } catch { present = false }
               if (present) {
                 resolvedInject.push(name)
-              } else if (name !== 'themePlugins') {
+              } else {
                 missing.push(name)
               }
             }
@@ -454,20 +454,7 @@ function apply(ctx) {
             const fiber = ctx.plugin({
               inject: resolvedInject,
               apply: (skinCtx) => {
-                let target = skinCtx
-                if (skinInject.includes('themePlugins') && typeof target.themePlugins === 'undefined') {
-                  target = Object.create(target)
-                  target.themePlugins = {
-                    registerAdapter(adapter) {
-                      if (adapter && typeof adapter.activate === 'function') {
-                        const cleanup = adapter.activate()
-                        if (typeof cleanup === 'function') domCleanup = cleanup
-                      }
-                      return () => {}
-                    },
-                  }
-                }
-                const result = applyFn(target)
+                const result = applyFn(skinCtx)
                 if (typeof result === 'function') domCleanup = result
               },
               name: 'dsh-custom-theme-import:skin',
