@@ -109,6 +109,32 @@ Instead of embedding CSS/DOM, a manifest can reference files on disk:
 - Editing source files takes effect after the plugin reloads; no need to keep
   a huge generated JSON in sync.
 
+## Collection repo format
+
+A GitHub/local directory can contain multiple themes as a collection:
+
+```text
+repo-root/
+├── README.md
+└── themes/
+    ├── theme-a/
+    │   ├── theme.json
+    │   ├── theme.css
+    │   └── dom.js
+    └── theme-b/
+        ├── theme.json
+        ├── theme.css
+        └── dom.js
+```
+
+Rules:
+
+- Root must contain a `themes/` directory when it is not itself a single theme.
+- Each theme directory must contain `theme.json` (with `css`/`cssFile`) or `theme.css`.
+- Importing a collection adds every valid theme as a separate entry in the library.
+- Invalid entries are skipped only if at least one valid theme exists; if none
+  are valid the whole import is rejected.
+
 ## Storage
 
 - Library file: `~/.dsh/dsh-custom-theme-import/library.json`
