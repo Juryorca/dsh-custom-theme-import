@@ -1,27 +1,26 @@
 # dsh-custom-theme-import
 
-A self-contained DSH Web plugin that lets you import, manage, and apply custom
-theme packs containing **CSS + optional DOM script**. The theme library is
-stored on the host machine at:
+A DSH Web plugin for importing, managing, previewing, and applying custom
+themes. It keeps a theme library on the host machine at:
 
 ```text
 ~/.dsh/dsh-custom-theme-import/library.json
 ```
 
-It does not depend on `dsh-skins`, and it survives browser changes, browser
-data clears, and official plugin updates.
+Themes are stored as lightweight source files (`theme.json` + `theme.css` +
+optional `dom.js`), so authors can edit them directly and refresh without
+rebuilding or reinstalling.
 
 ## Features
 
-- Add a local theme by path:
-  - a `.dsh-theme.json` / `.json` inline pack
-  - a `.css` file
-  - a path-based theme project directory (`theme.json` + `theme.css` + `dom.js`)
-- Manage multiple themes in a library with Use / Disable / Export / Delete.
-- Active theme is persisted on the host and shared across browsers.
-- Export a theme as a `.dsh-theme.json` file.
-- Disable the custom theme without uninstalling.
-- Ships an Isaac Basement theme example in `examples/`.
+- Import local themes by path.
+- Import GitHub repositories or raw files; theme collections are supported.
+- Add to library without switching the active theme.
+- Preview a theme without committing to it.
+- Use / disable / refresh / export / delete themes.
+- Host-side persistence: survives browser changes and browser data clears.
+- Managed copies for remote imports; local imports can stay in place or be
+  copied into the plugin library.
 
 ## Build
 
@@ -49,50 +48,20 @@ Open:
 设置 → 插件配置 → Web UI 插件 → 自定义主题导入
 ```
 
-## Use the Isaac Basement theme
+## Theme format
 
-Isaac theme source: https://github.com/Juryorca/isaac-basement-theme
+### Single theme project
 
-Recommended (path-based development layout): clone the theme repo, then in the
-plugin UI add the theme project directory by path:
-
-```text
-/path/to/isaac-basement-theme
-```
-
-or add its manifest:
+A theme is a directory containing:
 
 ```text
-/path/to/isaac-basement-theme/theme.json
+my-theme/
+├── theme.json
+├── theme.css
+└── dom.js          # optional
 ```
 
-The plugin reads `theme.css` and `dom.js` from disk, so you can edit the theme
-sources directly without regenerating an embedded JSON pack.
-
-## Theme pack format
-
-### Inline pack (embedded)
-
-```json
-{
-  "format": "dsh-custom-theme-import",
-  "version": 1,
-  "manifest": {
-    "id": "my-theme",
-    "name": "My Theme",
-    "css": "/* full CSS */",
-    "dom": "(ctx) => { /* optional DOM setup; may use ctx.effect */ }"
-  }
-}
-```
-
-The `dom` field is optional. It may be a function expression that receives
-`ctx`, or a function body that uses `ctx.effect`. If it returns a function,
-that function is used as the cleanup disposer.
-
-### Path-based theme project (recommended for development)
-
-Instead of embedding CSS/DOM, a manifest can reference files on disk:
+`theme.json`:
 
 ```json
 {
@@ -103,15 +72,32 @@ Instead of embedding CSS/DOM, a manifest can reference files on disk:
 }
 ```
 
-- The path can point to this `theme.json` directly, or to a directory
-  containing `theme.json` / `theme.css` / `dom.js`.
-- `cssFile` and `domFile` are resolved relative to the manifest/directory.
-- Editing source files takes effect after the plugin reloads; no need to keep
-  a huge generated JSON in sync.
+Rules:
 
-## Collection repo format
+- `theme.json` must contain `css` or `cssFile`.
+- `theme.css` is required unless `css` is embedded in `theme.json`.
+- `dom.js` is optional. It may be a function expression `(ctx) => { ... }` or a
+  function body that uses `ctx.effect`. If it returns a function, that
+  function is used as the cleanup disposer.
 
-A GitHub/local directory can contain multiple themes as a collection:
+### Inline pack (for distribution)
+
+```json
+{
+  "format": "dsh-custom-theme-import",
+  "version": 1,
+  "manifest": {
+    "id": "my-theme",
+    "name": "My Theme",
+    "css": "/* full CSS */",
+    "dom": "(ctx) => { /* optional DOM setup */ }"
+  }
+}
+```
+
+### Collection repository
+
+A GitHub repository or local directory can contain multiple themes:
 
 ```text
 repo-root/
@@ -129,11 +115,28 @@ repo-root/
 
 Rules:
 
-- Root must contain a `themes/` directory when it is not itself a single theme.
+- If the root is not itself a single theme, it must contain a `themes/` directory.
 - Each theme directory must contain `theme.json` (with `css`/`cssFile`) or `theme.css`.
-- Importing a collection adds every valid theme as a separate entry in the library.
+- Importing a collection adds every valid theme as a separate entry.
 - Invalid entries are skipped only if at least one valid theme exists; if none
-  are valid the whole import is rejected.
+  are valid, the whole import is rejected.
+
+## Example collection
+
+```text
+https://github.com/Juryorca/dsh-themes
+```
+
+Structure:
+
+```text
+dsh-themes/
+└── themes/
+    └── isaac-basement/
+        ├── theme.json
+        ├── theme.css
+        └── dom.js
+```
 
 ## Storage
 
@@ -142,7 +145,5 @@ Rules:
   them into `~/.dsh/dsh-custom-theme-import/themes/<id>/` as a managed copy.
 - GitHub/remote imports are cloned/downloaded into:
   `~/.dsh/dsh-custom-theme-import/themes/<id>/`
-- Entries can still be inline (`css` / `dom`) or path-based (`path` pointing to
-  a local `.json` / `.css` file).
 - The DOM script is executed as JavaScript in your browser; only import packs
   from sources you trust.
