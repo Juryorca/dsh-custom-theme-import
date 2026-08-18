@@ -4,7 +4,6 @@ const React = require('react')
 
 const ID = 'dsh-custom-theme-import'
 const NS = 'custom-theme-import'
-const STYLE_TAG_ID = `${ID}/theme`
 const READ_CHANNEL = '/dsh-custom-theme-import-read'
 const WRITE_CHANNEL = '/dsh-custom-theme-import-write'
 
@@ -483,34 +482,7 @@ function apply(ctx) {
       return
     }
 
-    const style = document.createElement('style')
-    style.dataset.plugin = ID
-    style.dataset.pluginCss = STYLE_TAG_ID
-
-    if (pack && pack.css) {
-      style.textContent = pack.css
-      document.head.appendChild(style)
-    }
-
-    if (pack && pack.dom) {
-      try {
-        let factory
-        try {
-          factory = new Function('ctx', `return (${pack.dom})(ctx)`)
-        } catch {
-          factory = new Function('ctx', pack.dom)
-        }
-        const result = factory(ctx)
-        if (typeof result === 'function') domCleanup = result
-      } catch (error) {
-        console.error('dsh-custom-theme-import: DOM apply failed', error)
-      }
-    }
-
-    currentCleanup = () => {
-      style.remove()
-      if (domCleanup) domCleanup()
-    }
+    throw new Error('该条目不是有效的 DSH 皮肤包（缺少 bundle）')
   }
 
   const api = {
