@@ -1,6 +1,6 @@
 {
   "name": "dsh-custom-theme-import",
-  "description": "DSH WebUI custom theme importer: import/manage/apply CSS+DOM theme packs, persisted on the host at ~/.dsh/dsh-custom-theme-import/library.json, without touching dsh-skins.",
+  "description": "DSH WebUI theme manager: import, preview, use, refresh, and manage mainstream DSH skin packages, persisted on the host at ~/.dsh/dsh-custom-theme-import/library.json.",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

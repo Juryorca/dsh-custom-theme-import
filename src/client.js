@@ -24,7 +24,6 @@ const zh = {
   use: '使用',
   disable: '禁用',
   preview: '预览',
-  export: '导出',
   delete: '删除',
   refresh: '刷新',
   copyLocal: '复制到插件主题库（托管副本）',
@@ -38,7 +37,6 @@ const zh = {
   stopped: '已停止使用当前主题',
   deleted: '已删除',
   deleteFailed: '删除失败：{message}',
-  exported: '已导出：{name}',
   pathRequired: '请填写本地主题文件路径',
   addedOne: '已添加到列表：{name}',
   addedCount: '已添加 {count} 个主题到列表',
@@ -65,7 +63,6 @@ const en = {
   use: 'Use',
   disable: 'Disable',
   preview: 'Preview',
-  export: 'Export',
   delete: 'Delete',
   refresh: 'Refresh',
   copyLocal: 'Copy into the plugin theme library (managed copy)',
@@ -79,7 +76,6 @@ const en = {
   stopped: 'Stopped using the current theme',
   deleted: 'Deleted',
   deleteFailed: 'Delete failed: {message}',
-  exported: 'Exported: {name}',
   pathRequired: 'Enter a local theme path',
   addedOne: 'Added to library: {name}',
   addedCount: 'Added {count} themes to library',
@@ -92,16 +88,6 @@ const en = {
 
 function makeId() {
   return `pack-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function download(filename, text) {
-  const blob = new Blob([text], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
 }
 
 function ThemeCard({ api, t }) {
@@ -220,19 +206,6 @@ function ThemeCard({ api, t }) {
     }
   }
 
-  const exportPack = (pack) => {
-    if (pack.bundle) {
-      notify('标准皮肤包请使用 GitHub/本地路径导入，暂不支持浏览器导出完整包')
-      return
-    }
-    download(`${pack.name.toLowerCase().replace(/\s+/g, '-')}.dsh-theme.json`, JSON.stringify({
-      format: 'dsh-custom-theme-import',
-      version: 1,
-      manifest: { id: pack.id, name: pack.name, css: pack.css, dom: pack.dom },
-    }, null, 2))
-    notify(fmt('exported', { name: pack.name }))
-  }
-
   const applyView = (view, message) => {
     setState((current) => {
       const next = {
@@ -332,7 +305,6 @@ function ThemeCard({ api, t }) {
           h('div', { key: 'ops', style: { display: 'flex', gap: '6px', flexShrink: 0 } }, [
             h('button', { key: 'apply', onClick: () => active ? disableActive() : applyPack(pack.id), style: { ...buttonStyle, marginRight: 0 } }, active ? t('disable') : t('use')),
             h('button', { key: 'preview', onClick: () => previewPack(pack.id) }, t('preview')),
-            h('button', { key: 'export', onClick: () => exportPack(pack) }, t('export')),
             h('button', { key: 'delete', onClick: () => deletePack(pack.id) }, t('delete')),
           ]),
         ])
@@ -440,7 +412,7 @@ function apply(ctx) {
           }
         }
       } catch (error) {
-        console.error('dsh-custom-theme-import: standard bundle apply failed', error)
+        console.error('dsh-custom-theme-import: mainstream bundle apply failed', error)
       }
       currentCleanup = () => {
         if (skinFiber) { skinFiber.dispose(); skinFiber = null }

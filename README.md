@@ -2,12 +2,12 @@
 
 English | [中文](README.zh.md)
 
-A DSH Web skin manager for standard DSH skin packages. It imports, previews,
+A DSH Web skin manager for mainstream DSH skin package format. It imports, previews,
 uses, and manages skins without replacing DSH's native plugin system.
 
 ## Features
 
-- Import standard DSH skin packages from local paths or GitHub.
+- Import mainstream DSH skin package format from local paths or GitHub.
 - Preview, use, refresh, and manage skins.
 - Host-side persistence with optional managed copies.
 - UI language follows DSH automatically (Chinese / English).
@@ -47,7 +47,7 @@ Settings → My Themes
 
 ## Supported skin format
 
-Standard DSH skin package:
+Mainstream DSH skin package format:
 
 ```text
 skin-package/
@@ -66,7 +66,7 @@ Requirements:
 
 ## Collection repository
 
-A GitHub repository can contain multiple standard skins:
+A GitHub repository can contain multiple mainstream skins:
 
 ```text
 repo-root/
