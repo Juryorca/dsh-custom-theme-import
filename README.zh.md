@@ -2,18 +2,12 @@
 
 [English](README.md) | 中文
 
-一个用于导入、管理、预览和应用自定义主题的 DSH Web 插件。主题库保存在本机：
-
-```text
-~/.dsh/dsh-custom-theme-import/library.json
-```
-
-主题以轻量源码文件保存（`theme.json` + `theme.css` + 可选 `dom.js`），作者可以直接编辑文件并刷新，无需重新构建或重装。
+一个用于管理标准 DSH 皮肤包的插件。支持导入、预览、使用和管理皮肤，不替代 DSH 原生插件系统。
 
 ## 功能
 
-- 导入本地路径和 GitHub 主题集合。
-- 预览、使用、刷新、管理主题。
+- 从本地路径或 GitHub 导入标准 DSH 皮肤包。
+- 预览、使用、刷新、管理皮肤。
 - 宿主持久化，可选择保存托管副本。
 - 界面语言自动跟随 DSH（中文 / English）。
 
@@ -26,17 +20,16 @@ node build.mjs --check
 
 ## 安装
 
-通过 GitHub 安装（推荐）：
+通过 GitHub 安装：
 
 ```bash
 dsh plugin --profile web add -w github:Juryorca/dsh-custom-theme-import
 ```
 
-或通过本地目录安装：
+通过本地目录安装：
 
 ```bash
-dsh plugin --profile web add -w \
-  link:/本地路径/dsh-custom-theme-import
+dsh plugin --profile web add -w link:/本地路径/dsh-custom-theme-import
 ```
 
 重启：
@@ -51,91 +44,38 @@ dsh --profile web
 设置 → 我的主题
 ```
 
-## 主题格式
+## 支持的皮肤格式
 
-### 单主题项目
-
-一个主题是一个目录：
+标准 DSH 皮肤包：
 
 ```text
-my-theme/
-├── theme.json
-├── theme.css
-└── dom.js          # 可选
+skin-package/
+├── package.json
+├── cordis.patch.yml
+├── skin.json
+├── lib/index.js
+└── lib/client.js
 ```
 
-`theme.json`：
+要求：
 
-```json
-{
-  "id": "my-theme",
-  "name": "My Theme",
-  "cssFile": "theme.css",
-  "domFile": "dom.js"
-}
-```
+- `package.json` 必须声明 `dsh.bundle`。
+- 必须有 `skin.json`。
+- `lib/client.js` 必须是导出 `apply(ctx)` 的 DSH ModuleLoader bundle。
 
-规则：
+## 集合仓库
 
-- `theme.json` 必须包含 `css` 或 `cssFile`。
-- 除非 `css` 已内嵌在 `theme.json`，否则必须有 `theme.css`。
-- `dom.js` 可选。可以是函数表达式 `(ctx) => { ... }`，也可以是使用 `ctx.effect` 的函数体；如果返回函数，该函数会被用作清理函数。
-
-### 内嵌包（用于分发）
-
-```json
-{
-  "format": "dsh-custom-theme-import",
-  "version": 1,
-  "manifest": {
-    "id": "my-theme",
-    "name": "My Theme",
-    "css": "/* 完整 CSS */",
-    "dom": "(ctx) => { /* 可选 DOM 逻辑 */ }"
-  }
-}
-```
-
-### 集合仓库
-
-GitHub 仓库或本地目录可以包含多个主题：
+GitHub 仓库可以包含多个标准皮肤：
 
 ```text
 repo-root/
-├── README.md
 └── themes/
-    ├── theme-a/
-    │   ├── theme.json
-    │   ├── theme.css
-    │   └── dom.js
-    └── theme-b/
-        ├── theme.json
-        ├── theme.css
-        └── dom.js
-```
-
-规则：
-
-- 如果根目录本身不是单个主题，则必须包含 `themes/` 目录。
-- 每个主题目录必须包含 `theme.json`（含 `css`/`cssFile`）或 `theme.css`。
-- 导入集合时，每个有效主题会作为独立条目加入主题库。
-- 只有至少存在一个有效主题时才会跳过无效条目；如果全部无效，则拒绝导入。
-
-## 示例集合
-
-```text
-https://github.com/Juryorca/dsh-themes
-```
-
-结构：
-
-```text
-dsh-themes/
-└── themes/
-    └── isaac-basement/
-        ├── theme.json
-        ├── theme.css
-        └── dom.js
+    └── <skin-id>/
+        ├── package.json
+        ├── cordis.patch.yml
+        ├── skin.json
+        ├── lib/index.js
+        └── lib/client.js
 ```
 
 ## 存储
@@ -145,4 +85,3 @@ dsh-themes/
   `~/.dsh/dsh-custom-theme-import/themes/<id>/`
 - GitHub/远程导入会克隆/下载到：
   `~/.dsh/dsh-custom-theme-import/themes/<id>/`
-- DOM 脚本会在你的浏览器中执行；请只导入可信来源的主题包。

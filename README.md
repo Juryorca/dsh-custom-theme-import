@@ -2,21 +2,13 @@
 
 English | [中文](README.zh.md)
 
-A DSH Web plugin for importing, managing, previewing, and applying custom
-themes. It keeps a theme library on the host machine at:
-
-```text
-~/.dsh/dsh-custom-theme-import/library.json
-```
-
-Themes are stored as lightweight source files (`theme.json` + `theme.css` +
-optional `dom.js`), so authors can edit them directly and refresh without
-rebuilding or reinstalling.
+A DSH Web skin manager for standard DSH skin packages. It imports, previews,
+uses, and manages skins without replacing DSH's native plugin system.
 
 ## Features
 
-- Import local paths and GitHub theme collections.
-- Preview, use, refresh, and manage themes.
+- Import standard DSH skin packages from local paths or GitHub.
+- Preview, use, refresh, and manage skins.
 - Host-side persistence with optional managed copies.
 - UI language follows DSH automatically (Chinese / English).
 
@@ -29,17 +21,16 @@ node build.mjs --check
 
 ## Install
 
-From GitHub (recommended):
+From GitHub:
 
 ```bash
 dsh plugin --profile web add -w github:Juryorca/dsh-custom-theme-import
 ```
 
-Or from a local checkout:
+From a local checkout:
 
 ```bash
-dsh plugin --profile web add -w \
-  link:/path/to/dsh-custom-theme-import
+dsh plugin --profile web add -w link:/path/to/dsh-custom-theme-import
 ```
 
 Restart:
@@ -54,94 +45,38 @@ Open:
 Settings → My Themes
 ```
 
-## Theme format
+## Supported skin format
 
-### Single theme project
-
-A theme is a directory containing:
+Standard DSH skin package:
 
 ```text
-my-theme/
-├── theme.json
-├── theme.css
-└── dom.js          # optional
+skin-package/
+├── package.json
+├── cordis.patch.yml
+├── skin.json
+├── lib/index.js
+└── lib/client.js
 ```
 
-`theme.json`:
+Requirements:
 
-```json
-{
-  "id": "my-theme",
-  "name": "My Theme",
-  "cssFile": "theme.css",
-  "domFile": "dom.js"
-}
-```
+- `package.json` must declare `dsh.bundle`.
+- `skin.json` must exist.
+- `lib/client.js` must be a DSH ModuleLoader bundle exporting `apply(ctx)`.
 
-Rules:
+## Collection repository
 
-- `theme.json` must contain `css` or `cssFile`.
-- `theme.css` is required unless `css` is embedded in `theme.json`.
-- `dom.js` is optional. It may be a function expression `(ctx) => { ... }` or a
-  function body that uses `ctx.effect`. If it returns a function, that
-  function is used as the cleanup disposer.
-
-### Inline pack (for distribution)
-
-```json
-{
-  "format": "dsh-custom-theme-import",
-  "version": 1,
-  "manifest": {
-    "id": "my-theme",
-    "name": "My Theme",
-    "css": "/* full CSS */",
-    "dom": "(ctx) => { /* optional DOM setup */ }"
-  }
-}
-```
-
-### Collection repository
-
-A GitHub repository or local directory can contain multiple themes:
+A GitHub repository can contain multiple standard skins:
 
 ```text
 repo-root/
-├── README.md
 └── themes/
-    ├── theme-a/
-    │   ├── theme.json
-    │   ├── theme.css
-    │   └── dom.js
-    └── theme-b/
-        ├── theme.json
-        ├── theme.css
-        └── dom.js
-```
-
-Rules:
-
-- If the root is not itself a single theme, it must contain a `themes/` directory.
-- Each theme directory must contain `theme.json` (with `css`/`cssFile`) or `theme.css`.
-- Importing a collection adds every valid theme as a separate entry.
-- Invalid entries are skipped only if at least one valid theme exists; if none
-  are valid, the whole import is rejected.
-
-## Example collection
-
-```text
-https://github.com/Juryorca/dsh-themes
-```
-
-Structure:
-
-```text
-dsh-themes/
-└── themes/
-    └── isaac-basement/
-        ├── theme.json
-        ├── theme.css
-        └── dom.js
+    └── <skin-id>/
+        ├── package.json
+        ├── cordis.patch.yml
+        ├── skin.json
+        ├── lib/index.js
+        └── lib/client.js
 ```
 
 ## Storage
@@ -151,5 +86,3 @@ dsh-themes/
   them into `~/.dsh/dsh-custom-theme-import/themes/<id>/` as a managed copy.
 - GitHub/remote imports are cloned/downloaded into:
   `~/.dsh/dsh-custom-theme-import/themes/<id>/`
-- The DOM script is executed as JavaScript in your browser; only import packs
-  from sources you trust.
