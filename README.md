@@ -15,14 +15,9 @@ rebuilding or reinstalling.
 
 ## Features
 
-- Import local themes by path.
-- Import GitHub repositories or raw files; theme collections are supported.
-- Add themes without interrupting your current theme.
-- Preview a theme before committing to it.
-- Use / disable / refresh / export / delete themes.
-- Host-side persistence: survives browser changes and browser data clears.
-- Managed copies for remote imports; local imports can stay in place or be
-  copied into the plugin library.
+- Import local paths and GitHub theme collections.
+- Preview, use, refresh, and manage themes.
+- Host-side persistence with optional managed copies.
 - UI language follows DSH automatically (Chinese / English).
 
 ## Build
