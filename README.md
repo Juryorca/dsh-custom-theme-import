@@ -1,5 +1,7 @@
 # dsh-custom-theme-import
 
+English | [中文](README.zh.md)
+
 A DSH Web plugin for importing, managing, previewing, and applying custom
 themes. It keeps a theme library on the host machine at:
 
@@ -21,6 +23,7 @@ rebuilding or reinstalling.
 - Host-side persistence: survives browser changes and browser data clears.
 - Managed copies for remote imports; local imports can stay in place or be
   copied into the plugin library.
+- UI language follows DSH automatically (Chinese / English).
 
 ## Build
 
@@ -45,7 +48,7 @@ dsh --profile web
 Open:
 
 ```text
-设置 → 我的主题（或 Settings → My Themes）
+Settings → My Themes
 ```
 
 ## Theme format
