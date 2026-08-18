@@ -65,18 +65,16 @@ skin-package/
 
 ## 集合仓库
 
-GitHub 仓库可以包含多个主流皮肤：
+GitHub 仓库或本地路径可以包含多个主流皮肤，以下常见布局会自动扫描：
 
 ```text
 repo-root/
-└── themes/
-    └── <skin-id>/
-        ├── package.json
-        ├── cordis.patch.yml
-        ├── skin.json
-        ├── lib/index.js
-        └── lib/client.js
+├── themes/<skin-id>/...
+├── skins/<skin-id>/...
+└── packages/*/skins/<skin-id>/...
 ```
+
+每个 `<skin-id>/` 都是完整皮肤包（`package.json`、`cordis.patch.yml`、`skin.json`、`lib/index.js`、`lib/client.js`）。
 
 ## 存储
 

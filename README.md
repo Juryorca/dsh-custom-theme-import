@@ -66,18 +66,18 @@ Requirements:
 
 ## Collection repository
 
-A GitHub repository can contain multiple mainstream skins:
+A GitHub repository or local path can contain multiple mainstream skins.
+Common layouts are scanned automatically:
 
 ```text
 repo-root/
-└── themes/
-    └── <skin-id>/
-        ├── package.json
-        ├── cordis.patch.yml
-        ├── skin.json
-        ├── lib/index.js
-        └── lib/client.js
+├── themes/<skin-id>/...
+├── skins/<skin-id>/...
+└── packages/*/skins/<skin-id>/...
 ```
+
+Each `<skin-id>/` is a full skin package (`package.json`, `cordis.patch.yml`,
+`skin.json`, `lib/index.js`, `lib/client.js`).
 
 ## Storage
 

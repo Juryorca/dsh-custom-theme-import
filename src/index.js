@@ -95,7 +95,7 @@ function startGithubImport(url) {
   const finish = () => {
     try {
       const entries = materializeManagedEntries(target)
-      if (entries.length === 0) throw new Error('无法识别该 GitHub 来源为主题：需要 theme.json / theme.css / 有效 .json/.css 文件，或 themes/ 集合目录')
+      if (entries.length === 0) throw new Error('无法识别该 GitHub 来源为皮肤：需要包含 skin.json 和 lib/client.js 的 DSH 皮肤包，或 skins/themes/packages 皮肤集合目录')
       const library = readLibrary()
       for (const entry of entries) {
         library.packs.push({ id: makeId(), name: entry.name, path: entry.path })
@@ -176,36 +176,46 @@ function startGithubImport(url) {
 }
 
 function validateManagedTheme(target) {
-  const stat = statSync(target)
-  if (stat.isDirectory()) {
+  try {
+    const stat = statSync(target)
+    if (!stat.isDirectory()) return false
     const skinJson = join(target, 'skin.json')
     const bundle = join(target, 'lib', 'client.js')
-    if (existsSync(skinJson) && existsSync(bundle)) return true
+    return existsSync(skinJson) && existsSync(bundle)
+  } catch {
+    return false
+  }
+}
 
-    const manifest = join(target, 'theme.json')
-    const css = join(target, 'theme.css')
-    if (existsSync(manifest)) {
-      try {
-        const parsed = JSON.parse(readFileSync(manifest, 'utf8'))
-        const m = parsed && parsed.manifest ? parsed.manifest : parsed
-        if (typeof m.css !== 'string' && typeof m.cssFile !== 'string') return false
-      } catch {
-        return false
-      }
-      return true
-    }
-    return existsSync(css)
-  }
-  if (/\.json$/i.test(target)) {
+function findSkinDirs(target, maxDepth = 4) {
+  if (validateManagedTheme(target)) return [target]
+  const results = []
+  const seen = new Set()
+  const walk = (dir, depth) => {
+    if (depth > maxDepth) return
+    let entries
     try {
-      const parsed = JSON.parse(readFileSync(target, 'utf8'))
-      const m = parsed && parsed.manifest ? parsed.manifest : parsed
-      return typeof m.css === 'string' || typeof m.cssFile === 'string'
+      entries = readdirSync(dir, { withFileTypes: true })
     } catch {
-      return false
+      return
+    }
+    for (const entry of entries) {
+      const name = entry.name
+      if (!entry.isDirectory()) continue
+      if (name === '.git' || name === 'node_modules' || name === 'lib' || name === 'dist' || name === 'build' || name === '.cache' || name.startsWith('.')) continue
+      const full = join(dir, name)
+      const resolved = resolve(full)
+      if (seen.has(resolved)) continue
+      seen.add(resolved)
+      if (validateManagedTheme(full)) {
+        results.push(full)
+        continue
+      }
+      walk(full, depth + 1)
     }
   }
-  return /\.css$/i.test(target)
+  walk(target, 0)
+  return results
 }
 
 function entryName(target, fallback) {
@@ -224,44 +234,32 @@ function entryName(target, fallback) {
 }
 
 function collectThemeEntries(target) {
-  if (validateManagedTheme(target)) {
-    return [{ name: entryName(target, basename(target)), path: target }]
-  }
-  const themesDir = join(target, 'themes')
-  if (existsSync(themesDir) && statSync(themesDir).isDirectory()) {
-    const entries = []
-    for (const entry of readdirSync(themesDir)) {
-      const candidate = join(themesDir, entry)
-      if (!statSync(candidate).isDirectory()) continue
-      if (validateManagedTheme(candidate)) entries.push({ name: entryName(candidate, entry), path: candidate })
-    }
-    return entries
-  }
-  return []
+  return findSkinDirs(target).map((dir) => ({ name: entryName(dir, basename(dir)), path: dir }))
 }
 
 function materializeManagedEntries(target) {
-  if (validateManagedTheme(target)) {
-    return [{ name: entryName(target, basename(target)), path: target }]
-  }
-  const themesDir = join(target, 'themes')
-  if (existsSync(themesDir) && statSync(themesDir).isDirectory()) {
-    const entries = []
-    for (const entry of readdirSync(themesDir)) {
-      const candidate = join(themesDir, entry)
-      if (!statSync(candidate).isDirectory()) continue
-      if (!validateManagedTheme(candidate)) continue
-      const flatId = makeId()
-      const flatTarget = join(THEMES_DIR, flatId)
-      rmSync(flatTarget, { recursive: true, force: true })
-      mkdirSync(flatTarget, { recursive: true })
-      cpSync(candidate, flatTarget, { recursive: true })
-      entries.push({ name: entryName(candidate, entry), path: flatTarget })
+  const dirs = findSkinDirs(target)
+  if (dirs.length === 0) return []
+  const entries = []
+  let keepRoot = false
+  const rootResolved = resolve(target)
+  for (const dir of dirs) {
+    if (resolve(dir) === rootResolved) {
+      keepRoot = true
+      entries.push({ name: entryName(dir, basename(dir)), path: dir })
+      continue
     }
-    rmSync(target, { recursive: true, force: true })
-    return entries
+    const flatId = makeId()
+    const flatTarget = join(THEMES_DIR, flatId)
+    rmSync(flatTarget, { recursive: true, force: true })
+    mkdirSync(flatTarget, { recursive: true })
+    cpSync(dir, flatTarget, { recursive: true })
+    entries.push({ name: entryName(dir, basename(dir)), path: flatTarget })
   }
-  return []
+  if (!keepRoot) {
+    rmSync(target, { recursive: true, force: true })
+  }
+  return entries
 }
 
 function isManagedPath(target) {
@@ -306,10 +304,23 @@ function resolvePack(pack) {
         const bundlePath = join(path, 'lib', 'client.js')
         if (existsSync(skinPath) && existsSync(bundlePath)) {
           const skin = JSON.parse(readFileSync(skinPath, 'utf8'))
+          let inject = []
+          let packageName = ''
+          try {
+            const pkg = JSON.parse(readFileSync(join(path, 'package.json'), 'utf8'))
+            if (pkg && pkg.dsh && pkg.dsh.client && Array.isArray(pkg.dsh.client.inject)) {
+              inject = pkg.dsh.client.inject
+            }
+            if (pkg && typeof pkg.name === 'string') packageName = pkg.name
+          } catch {
+            // package.json is optional for loading; inject is empty if absent.
+          }
           return {
             id: pack.id,
             name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (typeof skin.name === 'string' ? skin.name : basename(path)),
             bundle: readFileSync(bundlePath, 'utf8'),
+            inject,
+            packageName,
           }
         }
 
@@ -442,7 +453,7 @@ async function handle(endpoint, payload, write) {
         entries = collectThemeEntries(sourcePath)
       }
       if (entries.length === 0) {
-        return { ok: false, error: { code: 'invalid-theme', message: '无法识别该路径为主题：需要 theme.json / theme.css / 有效 .json/.css 文件，或 themes/ 集合目录', details: {} } }
+        return { ok: false, error: { code: 'invalid-theme', message: '无法识别该路径为皮肤：需要包含 skin.json 和 lib/client.js 的 DSH 皮肤包，或 skins/themes/packages 皮肤集合目录', details: {} } }
       }
       for (const entry of entries) {
         library.packs.push({ id: makeId(), name: entry.name, path: entry.path })
