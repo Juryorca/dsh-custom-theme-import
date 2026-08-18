@@ -14,6 +14,13 @@ const WRITE_CHANNEL = '/dsh-custom-theme-import-write'
 
 export const inject = ['connection']
 
+function expandHome(input) {
+  if (typeof input !== 'string' || input === '') return input
+  if (input === '~') return homedir()
+  if (input.startsWith('~/') || input.startsWith('~\\')) return join(homedir(), input.slice(2))
+  return input
+}
+
 function defaultLibrary() {
   return { version: 1, revision: 0, activeId: null, packs: [] }
 }
@@ -50,60 +57,63 @@ function resolvePack(pack) {
   })
 
   try {
-    if (pack && typeof pack.path === 'string' && pack.path !== '') {
-      const stat = statSync(pack.path)
+    const path = expandHome(pack && pack.path)
+    if (typeof path === 'string' && path !== '') {
+      const stat = statSync(path)
       if (stat.isDirectory()) {
         // Theme project directory: theme.json (recommended), theme.css, dom.js.
-        const manifestPath = join(pack.path, 'theme.json')
-        const cssPath = join(pack.path, 'theme.css')
-        const domPath = join(pack.path, 'dom.js')
+        const manifestPath = join(path, 'theme.json')
+        const cssPath = join(path, 'theme.css')
+        const domPath = join(path, 'dom.js')
         if (existsSync(manifestPath)) {
           const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-          const cssFile = typeof manifest.cssFile === 'string' ? resolve(pack.path, manifest.cssFile) : cssPath
-          const domFile = typeof manifest.domFile === 'string' ? resolve(pack.path, manifest.domFile) : domPath
+          const cssFile = typeof manifest.cssFile === 'string' ? resolve(path, manifest.cssFile) : cssPath
+          const domFile = typeof manifest.domFile === 'string' ? resolve(path, manifest.domFile) : domPath
           return {
             id: pack.id,
-            name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (typeof manifest.name === 'string' ? manifest.name : basename(pack.path)),
+            name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (typeof manifest.name === 'string' ? manifest.name : basename(path)),
             css: existsSync(cssFile) ? readFileSync(cssFile, 'utf8') : '',
             dom: existsSync(domFile) ? readFileSync(domFile, 'utf8') : '',
           }
         }
         return {
           id: pack.id,
-          name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : basename(pack.path),
+          name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : basename(path),
           css: existsSync(cssPath) ? readFileSync(cssPath, 'utf8') : '',
           dom: existsSync(domPath) ? readFileSync(domPath, 'utf8') : '',
         }
       }
 
-      const text = readFileSync(pack.path, 'utf8')
-      if (/\.json$/i.test(pack.path)) {
+      const text = readFileSync(path, 'utf8')
+      if (/\.json$/i.test(path)) {
         const parsed = JSON.parse(text)
         const manifest = parsed && parsed.manifest ? parsed.manifest : parsed
-        const base = dirname(resolve(pack.path))
+        const base = dirname(resolve(path))
         const cssFile = typeof manifest.cssFile === 'string' ? resolve(base, manifest.cssFile) : null
         const domFile = typeof manifest.domFile === 'string' ? resolve(base, manifest.domFile) : null
         return {
           id: pack.id,
-          name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (manifest && typeof manifest.name === 'string' ? manifest.name : basename(pack.path)),
+          name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (manifest && typeof manifest.name === 'string' ? manifest.name : basename(path)),
           css: cssFile ? readFileSync(cssFile, 'utf8') : (typeof manifest.css === 'string' ? manifest.css : ''),
           dom: domFile ? readFileSync(domFile, 'utf8') : (typeof manifest.dom === 'string' ? manifest.dom : (typeof pack.dom === 'string' ? pack.dom : '')),
         }
       }
 
       // Plain .css file.
-      const domPath = pack.domPath ? resolve(dirname(resolve(pack.path)), pack.domPath) : null
+      const domPath = pack.domPath ? resolve(dirname(resolve(path)), expandHome(pack.domPath)) : null
       return {
         id: pack.id,
-        name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : basename(pack.path),
+        name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : basename(path),
         css: text,
         dom: domPath ? readFileSync(domPath, 'utf8') : (typeof pack.dom === 'string' ? pack.dom : ''),
       }
     }
 
-    if (pack && typeof pack.cssPath === 'string' && pack.cssPath !== '') {
-      const css = readFileSync(pack.cssPath, 'utf8')
-      const dom = pack.domPath ? readFileSync(pack.domPath, 'utf8') : (typeof pack.dom === 'string' ? pack.dom : '')
+    const cssPath = expandHome(pack && pack.cssPath)
+    if (typeof cssPath === 'string' && cssPath !== '') {
+      const css = readFileSync(cssPath, 'utf8')
+      const domPath = expandHome(pack && pack.domPath)
+      const dom = domPath ? readFileSync(domPath, 'utf8') : (typeof pack.dom === 'string' ? pack.dom : '')
       return fallback({ css, dom })
     }
   } catch (error) {
