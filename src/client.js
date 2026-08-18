@@ -169,10 +169,13 @@ function ThemeCard({ api }) {
     persist(state.packs, null, '已停止使用当前主题')
   }
 
-  const deletePack = (id) => {
-    const nextPacks = state.packs.filter((pack) => pack.id !== id)
-    const nextActive = state.activeId === id ? null : state.activeId
-    persist(nextPacks, nextActive, '已删除')
+  const deletePack = async (id) => {
+    try {
+      const view = await api.deletePack(id)
+      applyView(view, '已删除')
+    } catch (error) {
+      notify(`删除失败：${error.message}`)
+    }
   }
 
   const exportPack = (pack) => {
@@ -387,6 +390,11 @@ function apply(ctx) {
     },
     async importGithub(url) {
       const response = await connection.rpc.call(WRITE_CHANNEL, 'importGithub', { url })
+      if (!response.ok) throw new Error(response.error.message)
+      return response.value
+    },
+    async deletePack(id) {
+      const response = await connection.rpc.call(WRITE_CHANNEL, 'deletePack', { id })
       if (!response.ok) throw new Error(response.error.message)
       return response.value
     },
