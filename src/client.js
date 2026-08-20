@@ -463,9 +463,9 @@ function apply(ctx) {
 
     if (pack && pack.moduleId) {
       try {
-        const modules = globalThis.__DSH_MODULES__
+        const modules = ctx.get('modules')
         if (!modules || typeof modules.import !== 'function' || typeof modules.invalidate !== 'function') {
-          throw new Error('当前 DSH 运行环境不支持动态皮肤加载（缺少 __DSH_MODULES__）')
+          throw new Error('当前 DSH 运行环境不支持动态皮肤加载（缺少 modules 服务）')
         }
         const moduleId = pack.moduleId
         modules.invalidate(moduleId)
@@ -516,9 +516,10 @@ function apply(ctx) {
       currentCleanup = () => {
         if (skinFiber) { skinFiber.dispose(); skinFiber = null }
         if (domCleanup) domCleanup()
-        if (currentSkinId && globalThis.__DSH_MODULES__ && typeof globalThis.__DSH_MODULES__.invalidate === 'function') {
+        const modules = ctx.get('modules')
+        if (currentSkinId && modules && typeof modules.invalidate === 'function') {
           for (const el of document.querySelectorAll(`style[data-plugin=${JSON.stringify(currentSkinId)}]`)) el.remove()
-          globalThis.__DSH_MODULES__.invalidate(currentSkinId)
+          modules.invalidate(currentSkinId)
           currentSkinId = null
         }
       }
@@ -590,6 +591,6 @@ function apply(ctx) {
   }, 'dsh-custom-theme-import: apply')
 }
 
-const inject = ['slots', 'locale', 'connection', 'theme']
+const inject = ['slots', 'locale', 'connection', 'theme', 'modules']
 
 module.exports = { apply, inject }
