@@ -130,8 +130,18 @@ function validateManagedTheme(target) {
     const stat = statSync(target)
     if (!stat.isDirectory()) return false
     const skinJson = join(target, 'skin.json')
-    const bundle = join(target, 'lib', 'client.js')
-    return existsSync(skinJson) && existsSync(bundle)
+    const bundle = clientBundlePath(target)
+    if (existsSync(skinJson) && existsSync(bundle)) return true
+    // Theme plugin fallback: no skin.json, but a standard DSH web client
+    // package with a prebuilt client bundle.
+    const pkgPath = join(target, 'package.json')
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+      if (pkg && pkg.dsh && pkg.dsh.client && pkg.dsh.client.platform === 'web' && existsSync(bundle)) {
+        return true
+      }
+    }
+    return false
   } catch {
     return false
   }
@@ -176,6 +186,12 @@ function entryName(target, fallback) {
       if (typeof skin.name === 'string' && skin.name.trim()) return skin.name
       if (typeof skin.nameEn === 'string' && skin.nameEn.trim()) return skin.nameEn
       if (typeof skin.id === 'string' && skin.id.trim()) return skin.id
+    }
+    const pkgPath = join(target, 'package.json')
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+      if (pkg && typeof pkg.name === 'string' && pkg.name.trim()) return pkg.name
+      if (pkg && typeof pkg.description === 'string' && pkg.description.trim()) return pkg.description
     }
   } catch {
     // Fall back to directory/file name.
@@ -349,38 +365,57 @@ function resolvePack(pack) {
     if (!stat.isDirectory()) return fallback({ error: '不是有效的 DSH 皮肤包：需要 skin.json 和 lib/client.js' })
     const skinPath = join(path, 'skin.json')
     const bundlePath = clientBundlePath(path)
-    if (!existsSync(skinPath) || !existsSync(bundlePath)) {
-      return fallback({ error: '不是有效的 DSH 皮肤包：需要 skin.json 和 client bundle' })
-    }
-    const skin = JSON.parse(readFileSync(skinPath, 'utf8'))
-    let inject = []
-    let packageName = ''
-    try {
-      const pkg = JSON.parse(readFileSync(join(path, 'package.json'), 'utf8'))
-      if (pkg && pkg.dsh && pkg.dsh.client && Array.isArray(pkg.dsh.client.inject)) {
-        inject = pkg.dsh.client.inject
+    if (existsSync(skinPath) && existsSync(bundlePath)) {
+      const skin = JSON.parse(readFileSync(skinPath, 'utf8'))
+      let inject = []
+      let packageName = ''
+      try {
+        const pkg = JSON.parse(readFileSync(join(path, 'package.json'), 'utf8'))
+        if (pkg && pkg.dsh && pkg.dsh.client && Array.isArray(pkg.dsh.client.inject)) {
+          inject = pkg.dsh.client.inject
+        }
+        if (pkg && typeof pkg.name === 'string') packageName = pkg.name
+      } catch {
+        // package.json is optional for loading; inject is empty if absent.
       }
-      if (pkg && typeof pkg.name === 'string') packageName = pkg.name
-    } catch {
-      // package.json is optional for loading; inject is empty if absent.
+      const preview = {}
+      if (skin.preview && typeof skin.preview === 'object') {
+        for (const variant of ['light', 'dark']) {
+          const rel = skin.preview[variant]
+          if (typeof rel === 'string' && resolvePreviewPath(path, rel) !== null) {
+            preview[variant] = `${API_PREFIX}/preview?id=${encodeURIComponent(pack.id)}&variant=${variant}`
+          }
+        }
+      }
+      return {
+        id: pack.id,
+        name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (typeof skin.name === 'string' ? skin.name : basename(path)),
+        inject,
+        packageName,
+        moduleId: moduleIdFor(path),
+        preview,
+      }
     }
-    const preview = {}
-    if (skin.preview && typeof skin.preview === 'object') {
-      for (const variant of ['light', 'dark']) {
-        const rel = skin.preview[variant]
-        if (typeof rel === 'string' && resolvePreviewPath(path, rel) !== null) {
-          preview[variant] = `${API_PREFIX}/preview?id=${encodeURIComponent(pack.id)}&variant=${variant}`
+
+    // Theme plugin fallback: no skin.json, but a standard DSH web client
+    // package with a prebuilt client bundle.
+    if (existsSync(bundlePath)) {
+      const pkgPath = join(path, 'package.json')
+      if (existsSync(pkgPath)) {
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+        if (pkg && pkg.dsh && pkg.dsh.client && pkg.dsh.client.platform === 'web') {
+          return {
+            id: pack.id,
+            name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (typeof pkg.name === 'string' ? pkg.name : basename(path)),
+            inject: [],
+            packageName: typeof pkg.name === 'string' ? pkg.name : '',
+            moduleId: moduleIdFor(path),
+            preview: {},
+          }
         }
       }
     }
-    return {
-      id: pack.id,
-      name: typeof pack.name === 'string' && pack.name.trim() ? pack.name : (typeof skin.name === 'string' ? skin.name : basename(path)),
-      inject,
-      packageName,
-      moduleId: moduleIdFor(path),
-      preview,
-    }
+    return fallback({ error: '不是有效的 DSH 皮肤包/主题插件：需要 skin.json 或 dsh.client.web + client bundle' })
   } catch (error) {
     return fallback({ error: error instanceof Error ? error.message : String(error) })
   }

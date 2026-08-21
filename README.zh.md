@@ -7,6 +7,7 @@
 ## 功能
 
 - 从本地路径或 GitHub 导入主流 DSH 皮肤包格式。
+- 也兼容没有 `skin.json` 的 DSH 主题插件（`dsh.client.platform: "web"` + `lib/client.js`）。
 - 扫描 web profile 的 `node_modules` 中已安装皮肤。
 - 预览、使用、刷新、管理皮肤。
 - 皮肤自带 `skin.json` 预览图时显示缩略图。

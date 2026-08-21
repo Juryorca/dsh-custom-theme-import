@@ -8,6 +8,7 @@ uses, and manages skins without replacing DSH's native plugin system.
 ## Features
 
 - Import mainstream DSH skin package format from local paths or GitHub.
+- Also import DSH theme plugins without `skin.json` when they are standard web client packages (`dsh.client.platform: "web"` + `lib/client.js`).
 - Scan installed skins from the web profile's `node_modules`.
 - Preview, use, refresh, and manage skins.
 - Skin preview thumbnails when the package ships `skin.json` preview images.
